@@ -3,16 +3,16 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { query } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import citizenRoutes from './routes/citizenRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import { authenticate } from './middleware/authenticate.js';
+import { requirePortal } from './middleware/authorize.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
 app.use(helmet());
-
-// Read JSON bodies, but refuse huge ones
 app.use(express.json({ limit: '10kb' }));
-
-// Makes cookies available as req.cookies (used by the auth middleware in 2C)
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => {
@@ -32,6 +32,11 @@ app.get('/api/health/db', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+
+// Protected areas: the server enforces who may enter, not the frontend.
+// Each area accepts ONLY tokens issued for its own portal.
+app.use('/api/citizen', authenticate, requirePortal('citizen'), citizenRoutes);
+app.use('/api/admin', authenticate, requirePortal('admin'), adminRoutes);
 
 // These two MUST come last
 app.use('/api', notFound);

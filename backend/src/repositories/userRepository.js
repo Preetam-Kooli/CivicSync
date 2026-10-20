@@ -55,3 +55,8 @@ export async function resetLoginState(id) {
     [id]
   );
 }
+
+export async function findById(id) {
+  const { rows } = await query('SELECT * FROM users WHERE id = $1', [id]);
+  return rows[0] || null;
+}

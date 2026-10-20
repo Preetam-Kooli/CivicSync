@@ -3,6 +3,7 @@ import * as userRepo from '../repositories/userRepository.js';
 import * as refreshRepo from '../repositories/refreshTokenRepository.js';
 import * as auditRepo from '../repositories/auditRepository.js';
 import { AppError } from '../utils/AppError.js';
+import { PORTAL_ROLES, canUsePortal } from '../config/portals.js';
 import {
   signAccessToken,
   generateRefreshToken,
@@ -14,12 +15,6 @@ import {
 // attackers, fast enough that users don't notice.
 const BCRYPT_COST = 10;
 
-// Which database roles may sign in through which tab
-const PORTAL_ROLES = {
-  citizen: ['citizen', 'volunteer'],
-  admin: ['staff', 'admin', 'super_admin'],
-};
-
 // Stricter lockout for accounts with admin-side roles
 const LOCK_RULES = {
   citizen: { maxAttempts: 5, lockMinutes: 15 },
@@ -29,9 +24,22 @@ const lockRuleFor = (role) =>
   PORTAL_ROLES.admin.includes(role) ? LOCK_RULES.admin : LOCK_RULES.citizen;
 
 // Used when the email doesn't exist, so that case takes as long as a real
-// password check. Without it, attackers could time the responses to discover
-// which emails have accounts.
+// password check (otherwise response times would reveal which emails exist).
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_COST);
+
+// Creates a fresh access token + refresh token, and stores the refresh hash.
+// Used by both login and refresh.
+async function issueSession(user, portal) {
+  const accessToken = signAccessToken(user, portal);
+  const refreshToken = generateRefreshToken();
+  await refreshRepo.create({
+    userId: user.id,
+    tokenHash: hashToken(refreshToken),
+    portal,
+    expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000),
+  });
+  return { accessToken, refreshToken };
+}
 
 export async function registerCitizen({ fullName, email, phone, password }) {
   const existing = await userRepo.findByEmail(email);
@@ -44,8 +52,7 @@ export async function registerCitizen({ fullName, email, phone, password }) {
   try {
     return await userRepo.createCitizen({ fullName, email, phone, passwordHash });
   } catch (err) {
-    // 23505 is PostgreSQL's "unique violation" code (two people registering
-    // the same email at the same instant).
+    // 23505 is PostgreSQL's "unique violation" code
     if (err.code === '23505') {
       throw new AppError(409, 'An account with this email already exists');
     }
@@ -57,7 +64,6 @@ export async function login({ email, password, portal }, meta) {
   const user = await userRepo.findByEmail(email);
 
   // Records the failure in the audit log, then throws the SAME generic error
-  // for every kind of failure.
   const fail = async (action, userId = null) => {
     await auditRepo.record({ userId, email, portal, action, success: false, ...meta });
     throw new AppError(401, 'Invalid credentials');
@@ -81,23 +87,14 @@ export async function login({ email, password, portal }, meta) {
     return fail('login_failed', user.id);
   }
 
-  // The password is right, but is this the right portal for this account?
-  // The tab is only a request. The role stored in the database decides.
-  if (!PORTAL_ROLES[portal].includes(user.role)) {
+  // Right password, but is this the right portal? The role in the
+  // database decides, never the tab.
+  if (!canUsePortal(user.role, portal)) {
     return fail('login_portal_mismatch', user.id);
   }
 
-  // Success
   await userRepo.resetLoginState(user.id);
-
-  const accessToken = signAccessToken(user, portal);
-  const refreshToken = generateRefreshToken();
-  await refreshRepo.create({
-    userId: user.id,
-    tokenHash: hashToken(refreshToken),
-    portal,
-    expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000),
-  });
+  const session = await issueSession(user, portal);
 
   await auditRepo.record({
     userId: user.id,
@@ -108,5 +105,56 @@ export async function login({ email, password, portal }, meta) {
     ...meta,
   });
 
-  return { user: userRepo.toPublicUser(user), accessToken, refreshToken };
+  return { user: userRepo.toPublicUser(user), ...session };
+}
+
+// Swap a valid refresh token for a new pair (rotation: each token works once)
+export async function refreshSession(rawToken, meta) {
+  const deny = () => {
+    throw new AppError(401, 'Authentication required');
+  };
+  if (!rawToken) return deny();
+
+  const tokenHash = hashToken(rawToken);
+  const consumed = await refreshRepo.consume(tokenHash);
+
+  if (!consumed) {
+    // Unknown, expired, or ALREADY USED. If it was already used, someone may
+    // have copied it, so revoke every session for that user to be safe.
+    const old = await refreshRepo.findByHash(tokenHash);
+    if (old && old.revoked_at) {
+      await refreshRepo.revokeAllForUser(old.user_id);
+      await auditRepo.record({
+        userId: old.user_id,
+        portal: old.portal,
+        action: 'refresh_reuse_detected',
+        success: false,
+        ...meta,
+      });
+    }
+    return deny();
+  }
+
+  const user = await userRepo.findById(consumed.user_id);
+  if (!user || !user.is_active || !canUsePortal(user.role, consumed.portal)) {
+    await refreshRepo.revokeAllForUser(consumed.user_id);
+    return deny();
+  }
+
+  const session = await issueSession(user, consumed.portal);
+  return { user: userRepo.toPublicUser(user), portal: consumed.portal, ...session };
+}
+
+export async function logout(rawToken, meta) {
+  if (!rawToken) return;
+  const revoked = await refreshRepo.revokeByHash(hashToken(rawToken));
+  if (revoked) {
+    await auditRepo.record({
+      userId: revoked.user_id,
+      portal: revoked.portal,
+      action: 'logout',
+      success: true,
+      ...meta,
+    });
+  }
 }

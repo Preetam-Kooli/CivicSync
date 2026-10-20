@@ -15,8 +15,13 @@ if (jwtAccessSecret.length < 32) {
   process.exit(1);
 }
 
+const isProd = process.env.NODE_ENV === 'production';
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
-  isProd: process.env.NODE_ENV === 'production',
+  isProd,
   jwtAccessSecret,
+  // The Vite dev server's address. In production the app and API share one
+  // address, so no extra origin needs trusting.
+  clientOrigin: process.env.CLIENT_ORIGIN || (isProd ? null : 'http://localhost:5173'),
 };

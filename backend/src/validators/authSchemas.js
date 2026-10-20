@@ -28,3 +28,19 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Password needs an uppercase letter')
     .regex(/[0-9]/, 'Password needs a number'),
 });
+
+// Login only checks the SHAPE of the input. It deliberately does not
+// enforce password strength rules (that would reveal our policy to attackers).
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Enter a valid email address')
+    .max(254, 'Email is too long'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .max(72, 'Password is too long'),
+  portal: z.enum(['citizen', 'admin']),
+});

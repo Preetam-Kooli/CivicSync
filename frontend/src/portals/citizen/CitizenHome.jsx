@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth.js';
 import { api } from '../../lib/api.js';
 
 export default function CitizenHome() {
-  const { session, logout } = useAuth();
+  const { session } = useAuth();
   const [serverSays, setServerSays] = useState('checking…');
 
   useEffect(() => {
@@ -13,19 +14,8 @@ export default function CitizenHome() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-3xl p-4 sm:p-8">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-emerald-700">CivicSync</h1>
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base hover:bg-slate-100"
-        >
-          Log out
-        </button>
-      </header>
-
-      <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="text-lg">
           Welcome, <strong>{session.user.fullName}</strong>
         </p>
@@ -36,6 +26,25 @@ export default function CitizenHome() {
           Server says: <span className="font-mono">{serverSays}</span>
         </p>
       </section>
-    </main>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Link
+          to="/citizen/report"
+          className="rounded-2xl bg-emerald-600 p-6 text-white shadow-sm transition hover:bg-emerald-700"
+        >
+          <h2 className="text-lg font-semibold">Report an issue</h2>
+          <p className="mt-1 text-sm text-emerald-50">
+            Potholes, streetlights, flooding, fire hazards.
+          </p>
+        </Link>
+        <Link
+          to="/citizen/reports"
+          className="rounded-2xl bg-white p-6 shadow-sm transition hover:bg-slate-50"
+        >
+          <h2 className="text-lg font-semibold text-slate-800">My reports</h2>
+          <p className="mt-1 text-sm text-slate-500">Track what you have reported.</p>
+        </Link>
+      </section>
+    </div>
   );
 }

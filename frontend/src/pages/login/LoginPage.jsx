@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth.js';
 import FullPageSpinner from '../../shared/FullPageSpinner.jsx';
 
@@ -123,6 +123,15 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Log in'}
           </button>
         </form>
+        
+        {portal === 'citizen' && (
+          <p className="mt-4 text-center text-sm text-slate-600">
+            New here?{' '}
+            <Link to="/register" className="font-medium text-emerald-700 underline">
+              Create an account
+            </Link>
+          </p>
+        )}
 
         {portal === 'admin' && (
           <p className="mt-4 text-center text-xs text-slate-500">

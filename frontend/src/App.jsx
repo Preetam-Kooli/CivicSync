@@ -1,22 +1,39 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import RequireAuth from './auth/RequireAuth.jsx';
+import FullPageSpinner from './shared/FullPageSpinner.jsx';
+import LoginPage from './pages/login/LoginPage.jsx';
+import CitizenHome from './portals/citizen/CitizenHome.jsx';
+
+const AdminHome = lazy(() => import('./portals/admin/AdminHome.jsx'));
 
 export default function App() {
-  const [health, setHealth] = useState(null)
-  const [error, setError] = useState(null)
-
-  // useEffect runs once when the page loads: here it calls our API
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then(setHealth)
-      .catch(() => setError('Cannot reach the API'))
-  }, [])
-
   return (
-    <main style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>CivicSync</h1>
-      {health && <p>API says: {health.status}</p>}
-      {error && <p>{error}</p>}
-    </main>
-  )
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        path="/citizen"
+        element={
+          <RequireAuth portal="citizen">
+            <CitizenHome />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth portal="admin">
+            <Suspense fallback={<FullPageSpinner />}>
+              <AdminHome />
+            </Suspense>
+          </RequireAuth>
+        }
+      />
+
+      {/* Anything else goes to the login page for now */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
 }

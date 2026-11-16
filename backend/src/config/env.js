@@ -17,6 +17,13 @@ if (jwtAccessSecret.length < 32) {
 
 const isProd = process.env.NODE_ENV === 'production';
 
+// How many proxies sit between the internet and our server (see app.js)
+const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 1 || trustProxyHops > 5) {
+  console.error('TRUST_PROXY_HOPS must be a whole number from 1 to 5');
+  process.exit(1);
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd,
@@ -24,4 +31,5 @@ export const env = {
   // The Vite dev server's address. In production the app and API share one
   // address, so no extra origin needs trusting.
   clientOrigin: process.env.CLIENT_ORIGIN || (isProd ? null : 'http://localhost:5173'),
+  trustProxyHops,
 };

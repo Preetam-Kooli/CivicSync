@@ -44,3 +44,32 @@ export const loginSchema = z.object({
     .max(72, 'Password is too long'),
   portal: z.enum(['citizen', 'admin']),
 });
+
+// ---------- Phase 4 ----------
+
+const strongPassword = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(72, 'Password must be at most 72 characters')
+  .regex(/[a-z]/, 'Password needs a lowercase letter')
+  .regex(/[A-Z]/, 'Password needs an uppercase letter')
+  .regex(/[0-9]/, 'Password needs a number');
+
+const challengeToken = z.string().min(20).max(2000);
+
+export const challengeSchema = z.object({ challengeToken });
+
+export const twoFactorVerifySchema = z.object({
+  challengeToken,
+  code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+export const inviteTokenSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+});
+
+export const inviteAcceptSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+  fullName: z.string().trim().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
+  password: strongPassword,
+});

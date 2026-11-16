@@ -29,3 +29,12 @@ export const loginLimiter = (req, res, next) =>
   (req.body?.portal === 'admin' ? adminLogin : citizenLogin)(req, res, next);
 
 export const refreshLimiter = rateLimit({ ...base, windowMs: MINUTES_15, limit: 30 });
+
+// Only FAILED attempts count, so real users are not punished
+export const twoFactorLimiter = rateLimit({
+  ...base, windowMs: MINUTES_15, limit: 10, skipSuccessfulRequests: true,
+});
+
+export const inviteLimiter = rateLimit({
+  ...base, windowMs: MINUTES_15, limit: 20, skipSuccessfulRequests: true,
+});

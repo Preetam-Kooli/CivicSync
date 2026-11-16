@@ -1,4 +1,6 @@
 import * as authService from '../services/authService.js';
+import * as twoFactorService from '../services/twoFactorService.js';
+import * as inviteService from '../services/inviteService.js';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookies.js';
 
 const metaFrom = (req) => ({ ip: req.ip, userAgent: req.get('user-agent') });
@@ -9,13 +11,15 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
-  const { user, accessToken, refreshToken } = await authService.login(req.body, metaFrom(req));
+  const result = await authService.login(req.body, metaFrom(req));
 
-  // Tokens go into httpOnly cookies, NOT into the JSON response.
-  setAuthCookies(res, { accessToken, refreshToken });
+  // Admin portal: password was right, now the 2FA step. No cookies yet.
+  if (result.step) {
+    return res.json({ step: result.step, challengeToken: result.challengeToken });
+  }
 
-  // The frontend uses "portal" to decide which dashboard to show.
-  res.json({ user, portal: req.body.portal });
+  setAuthCookies(res, { accessToken: result.accessToken, refreshToken: result.refreshToken });
+  res.json({ user: result.user, portal: req.body.portal });
 }
 
 export async function refresh(req, res) {
@@ -27,7 +31,7 @@ export async function refresh(req, res) {
     setAuthCookies(res, { accessToken, refreshToken });
     res.json({ user, portal });
   } catch (err) {
-    clearAuthCookies(res); // a failed refresh means the cookies are useless
+    clearAuthCookies(res);
     throw err;
   }
 }
@@ -40,4 +44,22 @@ export async function logout(req, res) {
 
 export function me(req, res) {
   res.json({ user: req.auth.user, portal: req.auth.portal });
+}
+
+export async function twoFactorSetup(req, res) {
+  res.json(await twoFactorService.startSetup(req.body.challengeToken));
+}
+
+export async function twoFactorVerify(req, res) {
+  const { user, accessToken, refreshToken } = await twoFactorService.verify(req.body, metaFrom(req));
+  setAuthCookies(res, { accessToken, refreshToken });
+  res.json({ user, portal: 'admin' });
+}
+
+export async function inviteInspect(req, res) {
+  res.json(await inviteService.inspect(req.body.token));
+}
+
+export async function inviteAccept(req, res) {
+  res.json(await inviteService.accept(req.body, metaFrom(req)));
 }

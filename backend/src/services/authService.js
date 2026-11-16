@@ -6,30 +6,29 @@ import { AppError } from '../utils/AppError.js';
 import { PORTAL_ROLES, canUsePortal } from '../config/portals.js';
 import {
   signAccessToken,
+  signChallengeToken,
   generateRefreshToken,
   hashToken,
   REFRESH_TTL_DAYS,
 } from '../utils/tokens.js';
 
-// Cost 10 means 2^10 rounds of hashing: slow enough to frustrate
-// attackers, fast enough that users don't notice.
 const BCRYPT_COST = 10;
 
-// Stricter lockout for accounts with admin-side roles
+export const hashPassword = (password) => bcrypt.hash(password, BCRYPT_COST);
+
 const LOCK_RULES = {
   citizen: { maxAttempts: 5, lockMinutes: 15 },
   admin: { maxAttempts: 3, lockMinutes: 30 },
 };
-const lockRuleFor = (role) =>
+export const lockRuleFor = (role) =>
   PORTAL_ROLES.admin.includes(role) ? LOCK_RULES.admin : LOCK_RULES.citizen;
 
-// Used when the email doesn't exist, so that case takes as long as a real
-// password check (otherwise response times would reveal which emails exist).
+// Takes as long as a real password check, so unknown emails can't be detected by timing
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_COST);
 
-// Creates a fresh access token + refresh token, and stores the refresh hash.
-// Used by both login and refresh.
-async function issueSession(user, portal) {
+// Creates a fresh access token + refresh token and stores the refresh hash.
+// Used by login (citizens) and by the 2FA step (admins).
+export async function issueSession(user, portal) {
   const accessToken = signAccessToken(user, portal);
   const refreshToken = generateRefreshToken();
   await refreshRepo.create({
@@ -47,12 +46,11 @@ export async function registerCitizen({ fullName, email, phone, password }) {
     throw new AppError(409, 'An account with this email already exists');
   }
 
-  const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+  const passwordHash = await hashPassword(password);
 
   try {
     return await userRepo.createCitizen({ fullName, email, phone, passwordHash });
   } catch (err) {
-    // 23505 is PostgreSQL's "unique violation" code
     if (err.code === '23505') {
       throw new AppError(409, 'An account with this email already exists');
     }
@@ -63,7 +61,6 @@ export async function registerCitizen({ fullName, email, phone, password }) {
 export async function login({ email, password, portal }, meta) {
   const user = await userRepo.findByEmail(email);
 
-  // Records the failure in the audit log, then throws the SAME generic error
   const fail = async (action, userId = null) => {
     await auditRepo.record({ userId, email, portal, action, success: false, ...meta });
     throw new AppError(401, 'Invalid credentials');
@@ -87,28 +84,34 @@ export async function login({ email, password, portal }, meta) {
     return fail('login_failed', user.id);
   }
 
-  // Right password, but is this the right portal? The role in the
-  // database decides, never the tab.
   if (!canUsePortal(user.role, portal)) {
     return fail('login_portal_mismatch', user.id);
   }
 
+  // ADMIN PORTAL: password and role are right, but no session is issued until
+  // the second factor passes. The failed-attempt counter is NOT reset here, so
+  // wrong 2FA codes keep counting toward the lockout.
+  if (portal === 'admin') {
+    await auditRepo.record({
+      userId: user.id, email, portal, action: 'login_password_ok', success: true, ...meta,
+    });
+    return {
+      step: user.totp_enabled ? 'totp_required' : 'totp_setup_required',
+      challengeToken: signChallengeToken(user),
+    };
+  }
+
+  // CITIZEN PORTAL: signed in right away
   await userRepo.resetLoginState(user.id);
   const session = await issueSession(user, portal);
 
   await auditRepo.record({
-    userId: user.id,
-    email,
-    portal,
-    action: 'login_success',
-    success: true,
-    ...meta,
+    userId: user.id, email, portal, action: 'login_success', success: true, ...meta,
   });
 
   return { user: userRepo.toPublicUser(user), ...session };
 }
 
-// Swap a valid refresh token for a new pair (rotation: each token works once)
 export async function refreshSession(rawToken, meta) {
   const deny = () => {
     throw new AppError(401, 'Authentication required');
@@ -119,8 +122,6 @@ export async function refreshSession(rawToken, meta) {
   const consumed = await refreshRepo.consume(tokenHash);
 
   if (!consumed) {
-    // Unknown, expired, or ALREADY USED. If it was already used, someone may
-    // have copied it, so revoke every session for that user to be safe.
     const old = await refreshRepo.findByHash(tokenHash);
     if (old && old.revoked_at) {
       await refreshRepo.revokeAllForUser(old.user_id);

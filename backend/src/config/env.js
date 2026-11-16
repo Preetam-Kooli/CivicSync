@@ -15,9 +15,15 @@ if (jwtAccessSecret.length < 32) {
   process.exit(1);
 }
 
+// AES-256 needs exactly 32 bytes = 64 hex characters
+const totpEncryptionKey = required('TOTP_ENCRYPTION_KEY');
+if (!/^[0-9a-fA-F]{64}$/.test(totpEncryptionKey)) {
+  console.error('TOTP_ENCRYPTION_KEY must be exactly 64 hex characters');
+  process.exit(1);
+}
+
 const isProd = process.env.NODE_ENV === 'production';
 
-// How many proxies sit between the internet and our server (see app.js)
 const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
 if (!Number.isInteger(trustProxyHops) || trustProxyHops < 1 || trustProxyHops > 5) {
   console.error('TRUST_PROXY_HOPS must be a whole number from 1 to 5');
@@ -28,8 +34,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd,
   jwtAccessSecret,
-  // The Vite dev server's address. In production the app and API share one
-  // address, so no extra origin needs trusting.
+  totpEncryptionKey,
   clientOrigin: process.env.CLIENT_ORIGIN || (isProd ? null : 'http://localhost:5173'),
   trustProxyHops,
 };

@@ -20,6 +20,10 @@ const NO_REFRESH_PATHS = [
   '/api/auth/register',
   '/api/auth/refresh',
   '/api/auth/logout',
+  '/api/auth/2fa/setup',
+  '/api/auth/2fa/verify',
+  '/api/auth/invite/inspect',
+  '/api/auth/invite/accept',
 ];
 
 export class ApiError extends Error {

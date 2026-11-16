@@ -5,19 +5,23 @@ import FullPageSpinner from './shared/FullPageSpinner.jsx';
 import ComingSoon from './shared/ComingSoon.jsx';
 import LoginPage from './pages/login/LoginPage.jsx';
 import RegisterPage from './pages/register/RegisterPage.jsx';
+import AcceptInvitePage from './pages/invite/AcceptInvitePage.jsx';
 import CitizenLayout from './portals/citizen/CitizenLayout.jsx';
 import CitizenHome from './portals/citizen/CitizenHome.jsx';
 
 // Loaded only when someone opens the admin area, so citizens never download it
+const AdminLayout = lazy(() => import('./portals/admin/AdminLayout.jsx'));
 const AdminHome = lazy(() => import('./portals/admin/AdminHome.jsx'));
+const UsersPage = lazy(() => import('./portals/admin/UsersPage.jsx'));
+const InvitesPage = lazy(() => import('./portals/admin/InvitesPage.jsx'));
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-      {/* One guarded layout, many pages inside it (they render in its <Outlet />) */}
       <Route
         path="/citizen"
         element={
@@ -42,11 +46,15 @@ export default function App() {
         element={
           <RequireAuth portal="admin">
             <Suspense fallback={<FullPageSpinner />}>
-              <AdminHome />
+              <AdminLayout />
             </Suspense>
           </RequireAuth>
         }
-      />
+      >
+        <Route index element={<AdminHome />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="invites" element={<InvitesPage />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

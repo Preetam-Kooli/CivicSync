@@ -7,8 +7,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // When the app first loads, ask the server "who am I?". This is what keeps
-  // you logged in after a page reload.
+  // On first load, ask the server "who am I?". This keeps you logged in after a reload.
   useEffect(() => {
     let cancelled = false;
     api('GET', '/api/auth/me')
@@ -26,32 +25,19 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // The browser's Back/Forward button can restore a FROZEN copy of the page
-  // (the "back/forward cache"), including its old login state. When that
-  // happens ("pageshow" with persisted = true), hide the page and ask the
-  // server again whether we are still logged in.
-  useEffect(() => {
-    function onPageShow(event) {
-      if (!event.persisted) return;
-      setLoading(true); // shows the spinner instead of stale content
-      api('GET', '/api/auth/me')
-        .then((data) => setSession({ user: data.user, portal: data.portal }))
-        .catch((err) => {
-          // Only a real "not logged in" answer logs us out. A network
-          // hiccup (status 0) should not.
-          if (err.status === 401) {
-            clearSessionHint();
-            setSession(null);
-          }
-        })
-        .finally(() => setLoading(false));
-    }
-    window.addEventListener('pageshow', onPageShow);
-    return () => window.removeEventListener('pageshow', onPageShow);
-  }, []);
-
+  // Citizens are signed in immediately. For the admin portal the server
+  // answers { step, challengeToken }: not signed in yet, a 2FA step comes next.
   const login = useCallback(async (email, password, portal) => {
     const data = await api('POST', '/api/auth/login', { email, password, portal });
+    if (data.step) return data;
+    setSessionHint();
+    setSession({ user: data.user, portal: data.portal });
+    return data;
+  }, []);
+
+  // The second step for admins: a correct 6-digit code finishes the login
+  const completeTwoFactor = useCallback(async (challengeToken, code) => {
+    const data = await api('POST', '/api/auth/2fa/verify', { challengeToken, code });
     setSessionHint();
     setSession({ user: data.user, portal: data.portal });
     return data;
@@ -67,8 +53,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, loading, login, logout }),
-    [session, loading, login, logout]
+    () => ({ session, loading, login, completeTwoFactor, logout }),
+    [session, loading, login, completeTwoFactor, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

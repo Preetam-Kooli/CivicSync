@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/useAuth.js';
 import { api } from '../../lib/api.js';
+import { ROLE_LABELS } from './constants.js';
 
 export default function AdminHome() {
-  const { session, logout } = useAuth();
+  const { session } = useAuth();
   const [serverSays, setServerSays] = useState('checking…');
 
   useEffect(() => {
@@ -13,29 +14,25 @@ export default function AdminHome() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-5xl p-4 sm:p-8">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-amber-700">CivicSync Admin</h1>
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base hover:bg-slate-100"
-        >
-          Log out
-        </button>
-      </header>
-
-      <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="text-lg">
           Welcome, <strong>{session.user.fullName}</strong>
         </p>
         <p className="mt-1 text-sm text-slate-500">
-          Admin portal, signed in as {session.user.role}.
+          Signed in as {ROLE_LABELS[session.user.role] || session.user.role} (two-factor verified).
         </p>
         <p className="mt-4 text-sm text-slate-600">
           Server says: <span className="font-mono">{serverSays}</span>
         </p>
       </section>
-    </main>
+
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-800">Issue management</h2>
+        <p className="mt-1 text-slate-600">
+          Verifying, assigning, and resolving reports arrives in Phases 5 and 6.
+        </p>
+      </section>
+    </div>
   );
 }

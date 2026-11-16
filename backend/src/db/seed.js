@@ -2,6 +2,14 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { pool } from '../config/db.js';
 
+// Safety: the seed creates accounts with a KNOWN password, so it must never
+// run against a real (hosted) database.
+const dbUrl = process.env.DATABASE_URL || '';
+if (!/@(localhost|127\.0\.0\.1)(:|\/)/.test(dbUrl)) {
+  console.error('Refusing to seed: DATABASE_URL does not point to localhost.');
+  process.exit(1);
+}
+
 // DEV ONLY: every seeded account gets this password.
 const DEV_PASSWORD = 'Passw0rd!';
 

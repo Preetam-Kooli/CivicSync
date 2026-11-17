@@ -8,6 +8,7 @@ export const toPublicUser = (row) => ({
   email: row.email,
   phone: row.phone,
   role: row.role,
+  department: row.department,
   createdAt: row.created_at,
 });
 

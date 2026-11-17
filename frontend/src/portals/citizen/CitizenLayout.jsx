@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth.js';
 
@@ -6,6 +6,7 @@ const LINKS = [
   { to: '/citizen', label: 'Home', end: true },
   { to: '/citizen/report', label: 'Report an issue' },
   { to: '/citizen/reports', label: 'My reports' },
+  { to: '/citizen/map', label: 'Map' },
 ];
 
 // NavLink tells us whether the link matches the current page (isActive)
@@ -121,7 +122,9 @@ export default function CitizenLayout() {
       </div>
 
       <main className="mx-auto max-w-5xl p-4 sm:p-8">
-        <Outlet />
+        <Suspense fallback={<p className="text-slate-500">Loading…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

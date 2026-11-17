@@ -39,7 +39,10 @@ async function rawRequest(method, path, body) {
   const headers = { 'X-Requested-With': 'CivicSync' };
   const options = { method, headers, credentials: 'same-origin' };
 
-  if (body !== undefined) {
+    if (body instanceof FormData) {
+    // The browser sets the multipart Content-Type (with its boundary) itself
+    options.body = body;
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }

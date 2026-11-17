@@ -7,6 +7,6 @@ export default defineConfig({
   server: {
     host: true, // listen on all network interfaces, so phones can connect
     // In development, forward /api requests to our Express server
-    proxy: { '/api': 'http://localhost:5000' },
+    proxy: { '/api': 'http://localhost:5000', '/uploads': 'http://localhost:5000' },
   },
 })

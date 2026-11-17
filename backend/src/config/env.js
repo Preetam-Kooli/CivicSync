@@ -15,7 +15,6 @@ if (jwtAccessSecret.length < 32) {
   process.exit(1);
 }
 
-// AES-256 needs exactly 32 bytes = 64 hex characters
 const totpEncryptionKey = required('TOTP_ENCRYPTION_KEY');
 if (!/^[0-9a-fA-F]{64}$/.test(totpEncryptionKey)) {
   console.error('TOTP_ENCRYPTION_KEY must be exactly 64 hex characters');
@@ -30,6 +29,21 @@ if (!Number.isInteger(trustProxyHops) || trustProxyHops < 1 || trustProxyHops > 
   process.exit(1);
 }
 
+// Photos go to Cloudinary in production (server disks are not permanent).
+// Locally, when this is empty, photos are saved in backend/uploads instead.
+const cloudinaryUrl = process.env.CLOUDINARY_URL || null;
+if (isProd && !cloudinaryUrl) {
+  console.error('CLOUDINARY_URL is required in production');
+  process.exit(1);
+}
+
+// Optional (Phase 6): lets an outside timer trigger the SLA job on a sleeping free server
+const cronSecret = process.env.CRON_SECRET || null;
+if (cronSecret && cronSecret.length < 24) {
+  console.error('CRON_SECRET must be at least 24 characters long');
+  process.exit(1);
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd,
@@ -37,4 +51,6 @@ export const env = {
   totpEncryptionKey,
   clientOrigin: process.env.CLIENT_ORIGIN || (isProd ? null : 'http://localhost:5173'),
   trustProxyHops,
+  cloudinaryUrl,
+  cronSecret,
 };

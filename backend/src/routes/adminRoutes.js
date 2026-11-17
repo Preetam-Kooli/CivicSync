@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { createInviteSchema } from '../validators/adminSchemas.js';
 import * as admin from '../controllers/adminController.js';
+import * as issueCtl from '../controllers/issueController.js';
 
 const router = Router();
 const superOnly = authorize('super_admin');
@@ -25,4 +26,5 @@ router.post('/users/:id/deactivate', superOnly, asyncHandler(admin.deactivateUse
 router.post('/users/:id/activate', superOnly, asyncHandler(admin.activateUser));
 router.post('/users/:id/reset-2fa', superOnly, asyncHandler(admin.resetUserTwoFactor));
 
+router.get('/issues', asyncHandler(issueCtl.adminList));
 export default router;

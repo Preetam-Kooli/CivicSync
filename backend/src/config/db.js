@@ -14,3 +14,18 @@ export const pool = new Pool({
 
 // $1, $2 placeholders keep user input separate from the SQL text (prevents SQL injection)
 export const query = (text, params) => pool.query(text, params);
+// Runs fn(client) inside one transaction: everything succeeds together or is rolled back.
+export async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}

@@ -12,12 +12,13 @@ import CitizenHome from './portals/citizen/CitizenHome.jsx';
 const ReportIssuePage = lazy(() => import('./portals/citizen/ReportIssuePage.jsx'));
 const MyReportsPage = lazy(() => import('./portals/citizen/MyReportsPage.jsx'));
 const IssueMapPage = lazy(() => import('./shared/IssueMapPage.jsx'));
-
 const AdminLayout = lazy(() => import('./portals/admin/AdminLayout.jsx'));
 const AdminHome = lazy(() => import('./portals/admin/AdminHome.jsx'));
 const IssuesPage = lazy(() => import('./portals/admin/IssuesPage.jsx'));
 const UsersPage = lazy(() => import('./portals/admin/UsersPage.jsx'));
 const InvitesPage = lazy(() => import('./portals/admin/InvitesPage.jsx'));
+const ReportDetailPage = lazy(() => import('./portals/citizen/ReportDetailPage.jsx'));
+const IssueDetailPage = lazy(() => import('./portals/admin/IssueDetailPage.jsx'));
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
         <Route index element={<CitizenHome />} />
         <Route path="report" element={<ReportIssuePage />} />
         <Route path="reports" element={<MyReportsPage />} />
+        <Route path="reports/:id" element={<ReportDetailPage />} />
         <Route path="map" element={<IssueMapPage />} />
       </Route>
 
@@ -52,7 +54,8 @@ export default function App() {
       >
         <Route index element={<AdminHome />} />
         <Route path="issues" element={<IssuesPage />} />
-        <Route path="map" element={<IssueMapPage />} />
+        <Route path="issues/:id" element={<IssueDetailPage />} />
+        <Route path="map" element={<IssueMapPage detailPath={(id) => `/admin/issues/${id}`} />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="invites" element={<InvitesPage />} />
       </Route>

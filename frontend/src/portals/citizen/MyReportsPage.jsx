@@ -33,7 +33,9 @@ export default function MyReportsPage() {
               <img src={i.photoUrl} alt="" width="64" height="64" loading="lazy" className="size-16 shrink-0 rounded-lg object-cover" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-slate-800">{i.title}</p>
+              <Link to={`/citizen/reports/${i.id}`} className="block truncate font-medium text-emerald-700 underline">
+                {i.title}
+              </Link>
               <p className="text-sm text-slate-500">
                 {i.category.name} · {MODULE_LABELS[i.category.module]} · {formatDate(i.createdAt)}
               </p>

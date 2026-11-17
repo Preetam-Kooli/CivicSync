@@ -9,3 +9,13 @@ export const createIssueSchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   addressText: z.string().trim().max(200).optional(),
 });
+
+export const transitionSchema = z.object({
+  to: z.enum(['verified', 'assigned', 'in_progress', 'resolved']),
+  assigneeId: z.coerce.number().int().positive().optional(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const reopenSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+});

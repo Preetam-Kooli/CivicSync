@@ -38,3 +38,11 @@ export const twoFactorLimiter = rateLimit({
 export const inviteLimiter = rateLimit({
   ...base, windowMs: MINUTES_15, limit: 20, skipSuccessfulRequests: true,
 });
+
+// Report forms: 15 submissions per hour per logged-in user
+export const reportLimiter = rateLimit({
+  ...base,
+  windowMs: HOUR,
+  limit: 15,
+  keyGenerator: (req) => String(req.auth.userId),
+});

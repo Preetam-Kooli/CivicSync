@@ -5,6 +5,8 @@ import { ROLE_LABELS } from './constants.js';
 
 const LINKS = [
   { to: '/admin', label: 'Dashboard', end: true },
+  { to: '/admin/issues', label: 'Issues' },
+  { to: '/admin/map', label: 'Map' },
   { to: '/admin/users', label: 'Users', superOnly: true },
   { to: '/admin/invites', label: 'Invitations', superOnly: true },
 ];

@@ -15,7 +15,6 @@ export default function ReportIssuePage() {
   const [form, setForm] = useState({ categoryId: '', title: '', description: '', severity: 3 });
   const [location, setLocation] = useState(null);
   const [photo, setPhoto] = useState(null);
-  const [preview, setPreview] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,15 +26,13 @@ export default function ReportIssuePage() {
       .catch((err) => setError(err.message));
   }, []);
 
+  const preview = photo ? URL.createObjectURL(photo) : '';
+
   useEffect(() => {
-    if (!photo) {
-      setPreview('');
-      return;
-    }
-    const url = URL.createObjectURL(photo);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const set = (name) => (e) => setForm((f) => ({ ...f, [name]: e.target.value }));
 

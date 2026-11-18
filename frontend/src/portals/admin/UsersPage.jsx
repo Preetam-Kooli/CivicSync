@@ -33,7 +33,13 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
-    if (isSuper) load();
+    if (!isSuper) return;
+
+    const timer = setTimeout(() => {
+      load();
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [isSuper, load]);
 
   if (!isSuper) {

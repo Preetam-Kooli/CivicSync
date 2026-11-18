@@ -111,14 +111,6 @@ async function seed() {
     }
     console.log(`seeded  ${users.length} users`);
 
-    // 3. Issues (only if there are none yet, so re-running never duplicates them)
-    const existing = await client.query('SELECT count(*)::int AS n FROM issues');
-    if (existing.rows[0].n > 0) {
-      console.log('skip    issues already exist (use --reset to start over)');
-      await client.query('COMMIT');
-      return;
-    }
-
     const catRows = (await client.query('SELECT id, module, name, sla_hours FROM categories')).rows;
     const catByName = Object.fromEntries(catRows.map((c) => [c.name, c]));
     const userRows = (await client.query('SELECT id, email, role, department FROM users')).rows;
@@ -128,6 +120,8 @@ async function seed() {
     );
 
     for (const [catName, email, title, sev, lng, lat, ward, finalStatus, daysAgo, dup] of issues) {
+      const already = await client.query('SELECT 1 FROM issues WHERE title = $1', [title]);
+      if (already.rowCount > 0) continue; // each demo report is added only if it is missing
       const cat = catByName[catName];
       const reporter = userByEmail[email];
       // Placeholder priority: severity x 3 + duplicates x 2 + days open.

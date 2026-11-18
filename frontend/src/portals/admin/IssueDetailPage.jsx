@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../lib/api.js';
 import { compressImage } from '../../lib/imageCompress.js';
@@ -31,18 +31,23 @@ export default function IssueDetailPage() {
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState(null);
 
-  const load = useCallback(async () => {
-    try {
-      setData(await api('GET', `/api/admin/issues/${id}`));
-      setError('');
-    } catch (err) {
-      setError(err.message);
-    }
-  }, [id]);
+    const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    api('GET', `/api/admin/issues/${id}`)
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setError('');
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, reloadKey]);
 
   async function submit(to) {
     setBusy(true);
@@ -64,7 +69,7 @@ export default function IssueDetailPage() {
       setNote('');
       setPhoto(null);
       setAssigneeId('');
-      await load();
+      setReloadKey((k) => k + 1);
     } catch (err) {
       setError(err.message);
     } finally {

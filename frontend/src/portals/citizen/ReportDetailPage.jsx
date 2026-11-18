@@ -33,7 +33,11 @@ export default function ReportDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => {
+      load();
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [load]);
 
   async function act(action, body) {
@@ -51,7 +55,7 @@ export default function ReportDetailPage() {
 
   function reopen() {
     const note = window.prompt('What is still wrong? (optional)');
-    if (note === null) return; // cancelled
+    if (note === null) return;
     act('reopen', { note });
   }
 
@@ -72,7 +76,7 @@ export default function ReportDetailPage() {
         <h1 className="text-xl font-semibold text-slate-800">{issue.title}</h1>
         <div className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={issue.status} />
-          <SlaBadge deadline={issue.slaDeadline} status={issue.status} escalationLevel={issue.escalationLevel} />
+          <SlaBadge status={issue.status} slaDeadline={issue.slaDeadline} escalationLevel={issue.escalationLevel} />
           {issue.duplicateCount > 1 && (
             <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
               Reported by {issue.duplicateCount} people

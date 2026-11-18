@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/useAuth.js';
 import { api } from '../../lib/api.js';
 import Field from '../../shared/Field.jsx';
@@ -26,18 +26,22 @@ export default function InvitesPage() {
   const [created, setCreated] = useState(null); // { link, email, expiresAt }
   const [copied, setCopied] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const data = await api('GET', '/api/admin/invites');
-      setInvites(data.invites);
-    } catch (err) {
-      setError(err.message);
-    }
-  }, []);
+    const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (isSuper) load();
-  }, [isSuper, load]);
+    if (!isSuper) return;
+    let cancelled = false;
+    api('GET', '/api/admin/invites')
+      .then((data) => {
+        if (!cancelled) setInvites(data.invites);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuper, reloadKey]);
 
   if (!isSuper) {
     return <p className="rounded-2xl bg-white p-6 text-slate-600 shadow-sm">Only Super Admins can send invitations.</p>;
@@ -63,7 +67,7 @@ export default function InvitesPage() {
         expiresAt: data.invite.expiresAt,
       });
       setForm((f) => ({ ...f, email: '' }));
-      await load();
+      setReloadKey((k) => k + 1);
     } catch (err) {
       const fromServer = {};
       for (const item of err.errors || []) {
@@ -89,7 +93,7 @@ export default function InvitesPage() {
     if (!window.confirm(`Revoke the invitation for ${invite.email}?`)) return;
     try {
       await api('DELETE', `/api/admin/invites/${invite.id}`);
-      await load();
+      setReloadKey((k) => k + 1);
     } catch (err) {
       setError(err.message);
     }

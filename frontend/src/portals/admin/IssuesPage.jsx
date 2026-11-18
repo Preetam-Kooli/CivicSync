@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api.js';
 import StatusBadge from '../../shared/StatusBadge.jsx';
@@ -14,22 +14,24 @@ export default function IssuesPage() {
   const [module, setModule] = useState('');
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
+    useEffect(() => {
+    let cancelled = false;
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (module) params.set('module', module);
-    try {
-      const data = await api('GET', `/api/admin/issues?${params}`);
-      setIssues(data.issues);
-      setError('');
-    } catch (err) {
-      setError(err.message);
-    }
+    api('GET', `/api/admin/issues?${params}`)
+      .then((data) => {
+        if (cancelled) return;
+        setIssues(data.issues);
+        setError('');
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true; // ignore a slow answer if the filter changed meanwhile
+    };
   }, [status, module]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   return (
     <div className="space-y-4">

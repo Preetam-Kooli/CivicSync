@@ -153,6 +153,12 @@ export default function LoginPage() {
               </p>
             )}
 
+            <p className="mt-4 text-center text-sm text-slate-600">
+              <Link to="/transparency" className="underline">See how issues are being resolved</Link>
+              {' · '}
+              <Link to="/open-data" className="underline">Open data</Link>
+            </p>
+
             {/* Only appears when running locally. Never in the production build. */}
             {import.meta.env.DEV && (
               <p className="mt-6 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">

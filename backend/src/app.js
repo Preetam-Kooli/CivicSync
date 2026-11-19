@@ -11,6 +11,8 @@ import authRoutes from './routes/authRoutes.js';
 import citizenRoutes from './routes/citizenRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import sharedRoutes from './routes/sharedRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
+import openRoutes from './routes/openRoutes.js';
 import internalRoutes from './routes/internalRoutes.js';
 import { authenticate } from './middleware/authenticate.js';
 import { requirePortal } from './middleware/authorize.js';
@@ -82,6 +84,10 @@ app.use('/api/citizen', noStore, authenticate, requirePortal('citizen'), citizen
 app.use('/api/admin', noStore, authenticate, requirePortal('admin'), adminRoutes);
 // Only exists when CRON_SECRET is set (for an optional outside timer)
 if (env.cronSecret) app.use('/api/internal', noStore, internalRoutes);
+
+// Public (no login) and open-data endpoints
+app.use('/api/public', publicRoutes);
+app.use('/api/open/v1', openRoutes);
 
 app.use('/api', notFound);
 

@@ -69,6 +69,32 @@ async function refreshPriorities() {
   return rowCount;
 }
 
+// ---------- Analytics views (Phase 7) ----------
+const ANALYTICS_VIEWS = ['mv_public_stats', 'mv_module_stats', 'mv_monthly_trends', 'mv_ward_leaderboard'];
+const ANALYTICS_EVERY_MS = 10 * 60 * 1000;
+let lastAnalytics = 0;
+let analyticsRunning = null;
+
+// CONCURRENTLY: readers keep seeing the old numbers until the new ones are ready
+async function refreshAnalytics() {
+  for (const view of ANALYTICS_VIEWS) {
+    await query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${view}`);
+  }
+  lastAnalytics = Date.now();
+}
+
+export async function ensureAnalyticsFresh() {
+  if (Date.now() - lastAnalytics < ANALYTICS_EVERY_MS) return;
+  if (!analyticsRunning) {
+    analyticsRunning = refreshAnalytics()
+      .catch((err) => console.error('[analytics] refresh failed:', err.message))
+      .finally(() => {
+        analyticsRunning = null;
+      });
+  }
+  await analyticsRunning;
+}
+
 let running = null;
 let lastRun = 0;
 
@@ -81,6 +107,7 @@ export async function runMaintenance(source = 'manual') {
         confirmed: await autoConfirmResolved(),
         reprioritised: await refreshPriorities(),
       };
+      await ensureAnalyticsFresh();
       lastRun = Date.now();
       if (result.escalated || result.confirmed) console.log(`[maintenance:${source}]`, result);
       return result;

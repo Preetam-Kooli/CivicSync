@@ -23,3 +23,16 @@ export const formatDate = (iso) =>
 
 export const formatDateTime = (iso) =>
   new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+export function formatHours(h) {
+  if (h === null || h === undefined) return '—';
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  if (h < 48) return `${Math.round(h * 10) / 10} h`;
+  return `${Math.round((h / 24) * 10) / 10} days`;
+}
+
+// "2026-11" -> "Nov 26"
+export function monthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+}

@@ -7,7 +7,7 @@ import * as admin from '../controllers/adminController.js';
 import * as issueCtl from '../controllers/issueController.js';
 import { uploadPhoto } from '../middleware/upload.js';
 import { transitionSchema } from '../validators/issueSchemas.js';
-
+import * as analytics from '../controllers/analyticsController.js';
 const router = Router();
 const superOnly = authorize('super_admin');
 
@@ -31,4 +31,6 @@ router.post('/users/:id/reset-2fa', superOnly, asyncHandler(admin.resetUserTwoFa
 router.get('/issues', asyncHandler(issueCtl.adminList));
 router.get('/issues/:id', asyncHandler(issueCtl.adminDetail));
 router.post('/issues/:id/transition', uploadPhoto, validate(transitionSchema), asyncHandler(issueCtl.adminTransition));
+router.get('/analytics', asyncHandler(analytics.adminAnalytics));
+router.get('/hotspots', asyncHandler(analytics.hotspots));
 export default router;

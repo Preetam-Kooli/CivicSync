@@ -7,6 +7,8 @@ const LINKS = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/issues', label: 'Issues' },
   { to: '/admin/map', label: 'Map' },
+  { to: '/admin/analytics', label: 'Analytics' },
+  { to: '/admin/hotspots', label: 'Hotspots' },
   { to: '/admin/users', label: 'Users', superOnly: true },
   { to: '/admin/invites', label: 'Invitations', superOnly: true },
 ];
@@ -21,8 +23,9 @@ export default function AdminLayout() {
   const [open, setOpen] = useState(false);
 
   // Only SHOW links the user may use. The server enforces it regardless.
-  const links = LINKS.filter((l) => !l.superOnly || session.user.role === 'super_admin');
-
+    const links = LINKS.filter(
+    (l) => (!l.superOnly || session.user.role === 'super_admin') && (!l.notStaff || session.user.role !== 'staff')
+  );
   // While the phone drawer is open: Escape closes it, and the page behind can't scroll
   useEffect(() => {
     if (!open) return;

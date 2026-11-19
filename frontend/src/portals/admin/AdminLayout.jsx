@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/admin/map', label: 'Map' },
   { to: '/admin/analytics', label: 'Analytics' },
   { to: '/admin/hotspots', label: 'Hotspots' },
+  { to: '/admin/alerts', label: 'Alerts', notStaff: true },
   { to: '/admin/users', label: 'Users', superOnly: true },
   { to: '/admin/invites', label: 'Invitations', superOnly: true },
 ];

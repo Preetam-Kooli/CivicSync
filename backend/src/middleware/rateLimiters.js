@@ -49,3 +49,10 @@ export const reportLimiter = rateLimit({
 
 export const publicLimiter = rateLimit({ ...base, windowMs: MINUTES_15, limit: 120 });
 export const openDataLimiter = rateLimit({ ...base, windowMs: MINUTES_15, limit: 100 });
+
+export const weatherCheckLimiter = rateLimit({
+  ...base,
+  windowMs: MINUTES_15,
+  limit: 6,
+  keyGenerator: (req) => String(req.auth.userId),
+});

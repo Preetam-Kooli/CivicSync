@@ -6,11 +6,15 @@ import IssueMap from './IssueMap.jsx';
 export default function IssueMapPage({ detailPath }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [zones, setZones] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api('GET', '/api/shared/map')
-      .then(setData)
+    Promise.all([api('GET', '/api/shared/map'), api('GET', '/api/shared/flood-zones')])
+      .then(([issues, z]) => {
+        setData(issues);
+        setZones(z);
+      })
       .catch((err) => setError(err.message));
   }, []);
 
@@ -20,10 +24,7 @@ export default function IssueMapPage({ detailPath }) {
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!data && !error && <p className="text-slate-500">Loading map…</p>}
       {data && (
-        <IssueMap
-          collection={data}
-          onOpenIssue={detailPath ? (id) => navigate(detailPath(id)) : undefined}
-        />
+        <IssueMap collection={data} zones={zones} onOpenIssue={detailPath ? (id) => navigate(detailPath(id)) : undefined} />
       )}
     </div>
   );

@@ -5,109 +5,107 @@ import { STATUS_LABELS } from './issueUi.js';
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const colorByModule = ['match', ['get', 'module'], ...MODULES.flatMap((m) => [m.id, m.color]), '#64748b'];
+const zoneColor = ['match', ['get', 'status'], 'high', '#dc2626', 'watch', '#f59e0b', '#3b82f6'];
 
-// Adds our data and layers. Runs again after every style switch, because
-// switching the base style (light/dark) removes everything we added.
+// Flood-risk polygons, drawn UNDER the issue layers
+function addZoneLayers(map, zones) {
+  if (map.getSource('zones')) return;
+  map.addSource('zones', { type: 'geojson', data: zones });
+  map.addLayer({
+    id: 'zones-fill', type: 'fill', source: 'zones',
+    paint: { 'fill-color': zoneColor, 'fill-opacity': ['match', ['get', 'status'], 'high', 0.35, 'watch', 0.25, 0.1] },
+  });
+  map.addLayer({
+    id: 'zones-line', type: 'line', source: 'zones',
+    paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [2, 2] },
+  });
+}
+
 function addIssueLayers(map, data) {
   if (map.getSource('issues')) return;
-
-  // "cluster: true" makes MapLibre group nearby points into numbered circles
   map.addSource('issues', { type: 'geojson', data, cluster: true, clusterMaxZoom: 15, clusterRadius: 45 });
   map.addSource('issues-heat', { type: 'geojson', data });
 
   map.addLayer({
-    id: 'heat',
-    type: 'heatmap',
-    source: 'issues-heat',
-    layout: { visibility: 'none' },
+    id: 'heat', type: 'heatmap', source: 'issues-heat', layout: { visibility: 'none' },
     paint: {
       'heatmap-weight': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.3, 5, 1],
       'heatmap-radius': 30,
       'heatmap-opacity': 0.7,
-      'heatmap-color': [
-        'interpolate', ['linear'], ['heatmap-density'],
-        0, 'rgba(0,0,0,0)', 0.3, '#fde68a', 0.6, '#f97316', 1, '#dc2626',
-      ],
+      'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(0,0,0,0)', 0.3, '#fde68a', 0.6, '#f97316', 1, '#dc2626'],
     },
   });
   map.addLayer({
-    id: 'clusters',
-    type: 'circle',
-    source: 'issues',
-    filter: ['has', 'point_count'],
+    id: 'clusters', type: 'circle', source: 'issues', filter: ['has', 'point_count'],
     paint: {
       'circle-color': ['step', ['get', 'point_count'], '#60a5fa', 10, '#f59e0b', 30, '#ef4444'],
       'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 30, 28],
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff',
     },
   });
   map.addLayer({
-    id: 'cluster-count',
-    type: 'symbol',
-    source: 'issues',
-    filter: ['has', 'point_count'],
+    id: 'cluster-count', type: 'symbol', source: 'issues', filter: ['has', 'point_count'],
     layout: { 'text-field': '{point_count_abbreviated}', 'text-size': 13, 'text-font': ['Noto Sans Regular'] },
     paint: { 'text-color': '#ffffff' },
   });
   map.addLayer({
-    id: 'points',
-    type: 'circle',
-    source: 'issues',
-    filter: ['!', ['has', 'point_count']],
+    id: 'points', type: 'circle', source: 'issues', filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-color': colorByModule,
-      'circle-radius': ['interpolate', ['linear'], ['get', 'severity'], 1, 6, 5, 11], // bigger = more severe
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#ffffff',
+      'circle-radius': ['interpolate', ['linear'], ['get', 'severity'], 1, 6, 5, 11],
+      'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff',
     },
   });
 }
 
-// Popups are built from DOM nodes with textContent, never from HTML strings, so
-// text typed by a citizen can never run as code (cross-site scripting).
-function showPopup(map, feature, onOpenIssue) {
-  const p = feature.properties;
+// Popups are built from DOM nodes with textContent, never from HTML strings (prevents script injection)
+function popup(map, lngLat, build) {
   const box = document.createElement('div');
   box.style.cssText = 'font: 14px/1.4 system-ui, sans-serif; min-width: 170px';
-
-  const title = document.createElement('strong');
-  title.textContent = p.title;
-  const meta = document.createElement('div');
-  meta.textContent = `${p.category} · ${STATUS_LABELS[p.status] || p.status}`;
-  box.append(title, meta);
-
-  if (Number(p.duplicateCount) > 1) {
-    const dup = document.createElement('div');
-    dup.textContent = `Reported by ${p.duplicateCount} people`;
-    box.append(dup);
-  }
-  if (onOpenIssue) {
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.textContent = 'Open details';
-    open.style.cssText = 'margin-top:8px;min-height:44px;width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px';
-    open.onclick = () => onOpenIssue(p.id);
-    box.append(open);
-  }
-
-  new Popup({ maxWidth: '260px', offset: 10 })
-    .setLngLat(feature.geometry.coordinates)
-    .setDOMContent(box)
-    .addTo(map);
+  build(box);
+  new Popup({ maxWidth: '260px', offset: 10 }).setLngLat(lngLat).setDOMContent(box).addTo(map);
 }
 
-export default function IssueMap({ collection, onOpenIssue }) {
+const line = (text, tag = 'div') => Object.assign(document.createElement(tag), { textContent: text });
+
+function showIssue(map, feature, onOpenIssue) {
+  const p = feature.properties;
+  popup(map, feature.geometry.coordinates, (box) => {
+    box.append(line(p.title, 'strong'), line(`${p.category} · ${STATUS_LABELS[p.status] || p.status}`));
+    if (Number(p.duplicateCount) > 1) box.append(line(`Reported by ${p.duplicateCount} people`));
+    if (onOpenIssue) {
+      const open = line('Open details', 'button');
+      open.type = 'button';
+      open.style.cssText = 'margin-top:8px;min-height:44px;width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px';
+      open.onclick = () => onOpenIssue(p.id);
+      box.append(open);
+    }
+  });
+}
+
+function showZone(map, e) {
+  const p = e.features[0].properties;
+  const risk = { normal: 'No flood risk expected', watch: 'Heavy rain watch', high: 'High flood risk' }[p.status];
+  popup(map, e.lngLat, (box) => {
+    box.append(line(p.name, 'strong'), line(risk));
+    if (p.forecastMm !== undefined && p.forecastMm !== null && p.forecastMm !== 'null') box.append(line(`Forecast: ${p.forecastMm} mm in 24 h`));
+  });
+}
+
+export default function IssueMap({ collection, zones, onOpenIssue }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const dataRef = useRef(EMPTY);
+  const zonesRef = useRef(EMPTY);
   const fittedRef = useRef(false);
   const appliedStyleRef = useRef(MAP_STYLES.light);
   const heatRef = useRef(false);
+  const showZonesRef = useRef(true);
   const onOpenRef = useRef(onOpenIssue);
 
   const [visibleModules, setVisibleModules] = useState(() => new Set(MODULES.map((m) => m.id)));
   const [showResolved, setShowResolved] = useState(false);
+  const [showZones, setShowZones] = useState(true);
   const [heat, setHeat] = useState(false);
   const [dark, setDark] = useState(false);
   const [tilt, setTilt] = useState(false);
@@ -115,9 +113,9 @@ export default function IssueMap({ collection, onOpenIssue }) {
   useEffect(() => {
     onOpenRef.current = onOpenIssue;
     heatRef.current = heat;
+    showZonesRef.current = showZones;
   });
 
-  // Only the features the filters allow
   const visible = useMemo(() => {
     if (!collection) return EMPTY;
     return {
@@ -128,26 +126,24 @@ export default function IssueMap({ collection, onOpenIssue }) {
     };
   }, [collection, visibleModules, showResolved]);
 
-  // Create the map once
   useEffect(() => {
-    const map = new GLMap({
-      container: containerRef.current,
-      style: MAP_STYLES.light,
-      center: DEFAULT_CENTER,
-      zoom: 14,
-    });
+    const map = new GLMap({ container: containerRef.current, style: MAP_STYLES.light, center: DEFAULT_CENTER, zoom: 14 });
     mapRef.current = map;
-        // The free Liberty style references a few icons its sprite sheet lacks.
-    // A blank 1x1 image stops the warnings (cosmetic only).
-    map.on('styleimagemissing', (e) => {
-      if (!map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
-    });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }), 'top-right');
 
+    // The free base style references a few icons its sprite sheet lacks; a blank one silences the warnings
+    map.on('styleimagemissing', (e) => {
+      if (!map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
+    });
+
     map.on('style.load', () => {
+      addZoneLayers(map, zonesRef.current);
       addIssueLayers(map, dataRef.current);
       map.setLayoutProperty('heat', 'visibility', heatRef.current ? 'visible' : 'none');
+      for (const id of ['zones-fill', 'zones-line']) {
+        map.setLayoutProperty(id, 'visibility', showZonesRef.current ? 'visible' : 'none');
+      }
     });
 
     map.on('click', 'clusters', async (e) => {
@@ -156,16 +152,19 @@ export default function IssueMap({ collection, onOpenIssue }) {
       const zoom = await map.getSource('issues').getClusterExpansionZoom(feature.properties.cluster_id);
       map.easeTo({ center: feature.geometry.coordinates, zoom });
     });
-    map.on('click', 'points', (e) => showPopup(map, e.features[0], onOpenRef.current));
-    for (const layer of ['clusters', 'points']) {
+    map.on('click', 'points', (e) => showIssue(map, e.features[0], onOpenRef.current));
+    map.on('click', 'zones-fill', (e) => {
+      // If an issue marker was tapped, let its popup win
+      if (map.queryRenderedFeatures(e.point, { layers: ['points', 'clusters'] }).length) return;
+      showZone(map, e);
+    });
+    for (const layer of ['clusters', 'points', 'zones-fill']) {
       map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
     }
 
-    // Keep the map correct when the phone rotates or the window resizes
     const observer = new ResizeObserver(() => map.resize());
     observer.observe(containerRef.current);
-
     return () => {
       observer.disconnect();
       map.remove();
@@ -173,7 +172,6 @@ export default function IssueMap({ collection, onOpenIssue }) {
     };
   }, []);
 
-  // New or filtered data
   useEffect(() => {
     dataRef.current = visible;
     const map = mapRef.current;
@@ -182,23 +180,32 @@ export default function IssueMap({ collection, onOpenIssue }) {
     map.getSource('issues-heat')?.setData(visible);
   }, [visible]);
 
-  // Zoom to fit all issues, once, when data first arrives
+  useEffect(() => {
+    zonesRef.current = zones || EMPTY;
+    mapRef.current?.getSource('zones')?.setData(zonesRef.current);
+  }, [zones]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || fittedRef.current || !collection?.features.length) return;
     fittedRef.current = true;
     const lngs = collection.features.map((f) => f.geometry.coordinates[0]);
     const lats = collection.features.map((f) => f.geometry.coordinates[1]);
-    map.fitBounds(
-      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 50, maxZoom: 16, duration: 0 }
-    );
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
+      padding: 50, maxZoom: 16, duration: 0,
+    });
   }, [collection]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (map?.getLayer('heat')) map.setLayoutProperty('heat', 'visibility', heat ? 'visible' : 'none');
   }, [heat]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer('zones-fill')) return;
+    for (const id of ['zones-fill', 'zones-line']) map.setLayoutProperty(id, 'visibility', showZones ? 'visible' : 'none');
+  }, [showZones]);
 
   useEffect(() => {
     mapRef.current?.easeTo({ pitch: tilt ? 60 : 0, bearing: tilt ? -20 : 0, duration: 600 });
@@ -209,7 +216,7 @@ export default function IssueMap({ collection, onOpenIssue }) {
     const url = dark ? MAP_STYLES.dark : MAP_STYLES.light;
     if (!map || appliedStyleRef.current === url) return;
     appliedStyleRef.current = url;
-    map.setStyle(url); // our layers come back through the 'style.load' handler above
+    map.setStyle(url);
   }, [dark]);
 
   function toggleModule(id) {
@@ -222,19 +229,14 @@ export default function IssueMap({ collection, onOpenIssue }) {
   }
 
   const chip = (on) =>
-    `min-h-11 rounded-full border px-3 text-sm ${
-      on ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-700'
-    }`;
+    `min-h-11 rounded-full border px-3 text-sm ${on ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-700'}`;
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {MODULES.map((m) => (
           <button
-            key={m.id}
-            type="button"
-            aria-pressed={visibleModules.has(m.id)}
-            onClick={() => toggleModule(m.id)}
+            key={m.id} type="button" aria-pressed={visibleModules.has(m.id)} onClick={() => toggleModule(m.id)}
             className={`flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm ${
               visibleModules.has(m.id) ? 'border-slate-400 bg-white text-slate-800' : 'border-slate-200 bg-slate-100 text-slate-400'
             }`}
@@ -245,28 +247,18 @@ export default function IssueMap({ collection, onOpenIssue }) {
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" aria-pressed={showResolved} onClick={() => setShowResolved((v) => !v)} className={chip(showResolved)}>
-          Show resolved
-        </button>
-        <button type="button" aria-pressed={heat} onClick={() => setHeat((v) => !v)} className={chip(heat)}>
-          Heatmap
-        </button>
-        <button type="button" aria-pressed={dark} onClick={() => setDark((v) => !v)} className={chip(dark)}>
-          Dark map
-        </button>
-        <button type="button" aria-pressed={tilt} onClick={() => setTilt((v) => !v)} className={chip(tilt)}>
-          3D tilt
-        </button>
+        <button type="button" aria-pressed={showZones} onClick={() => setShowZones((v) => !v)} className={chip(showZones)}>Flood zones</button>
+        <button type="button" aria-pressed={showResolved} onClick={() => setShowResolved((v) => !v)} className={chip(showResolved)}>Show resolved</button>
+        <button type="button" aria-pressed={heat} onClick={() => setHeat((v) => !v)} className={chip(heat)}>Heatmap</button>
+        <button type="button" aria-pressed={dark} onClick={() => setDark((v) => !v)} className={chip(dark)}>Dark map</button>
+        <button type="button" aria-pressed={tilt} onClick={() => setTilt((v) => !v)} className={chip(tilt)}>3D tilt</button>
       </div>
 
-      {/* The container needs an explicit height, or the map would be 0px tall */}
       <div
-        ref={containerRef}
-        role="region"
-        aria-label="Issue map"
+        ref={containerRef} role="region" aria-label="Issue map"
         className="h-[60dvh] min-h-[320px] w-full overflow-hidden rounded-2xl border border-slate-200"
       />
-      <p className="text-xs text-slate-500">Bigger dots are more severe. Tap a numbered circle to zoom in.</p>
+      <p className="text-xs text-slate-500">Bigger dots are more severe. Shaded areas are flood-risk zones: blue is normal, amber is a rain watch, red is high risk.</p>
     </div>
   );
 }

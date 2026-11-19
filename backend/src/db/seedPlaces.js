@@ -53,6 +53,27 @@ async function seedWards() {
   console.log(`checked ${r.rowCount} issues without a ward`);
 }
 
+// [name, longitude, latitude, radius in metres, watch mm, high mm]: demo flood zones
+const ZONES = [
+  ['Market low-lying area', 77.5335, 13.2985, 250, 25, 50],
+  ['Lane and underpass', 77.54, 13.2905, 300, 25, 50],
+  ['Farm road crossing', 77.53, 13.29, 200, 35, 65],
+];
+
+async function seedZones() {
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM flood_zones');
+  if (rows[0].n > 0) return console.log('skip    flood zones already exist');
+  for (const [name, lng, lat, radius, watch, high] of ZONES) {
+    // ST_Buffer around a point makes a circle-like polygon
+    await pool.query(
+      `INSERT INTO flood_zones (name, boundary, watch_mm, high_mm)
+       VALUES ($1, ST_Buffer(ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)::geography, $5, $6)`,
+      [name, lng, lat, radius, watch, high]
+    );
+  }
+  console.log(`added   ${ZONES.length} demo flood zones`);
+}
+
 async function refreshScores() {
   const r = await pool.query(
     `UPDATE issues SET priority_score = issue_priority(severity, duplicate_count, created_at, location)
@@ -68,6 +89,7 @@ async function refreshScores() {
 async function main() {
   await seedPlaces();
   await seedWards();
+  await seedZones();
   await refreshScores();
 }
 

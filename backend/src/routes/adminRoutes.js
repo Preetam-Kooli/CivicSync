@@ -8,6 +8,10 @@ import * as issueCtl from '../controllers/issueController.js';
 import { uploadPhoto } from '../middleware/upload.js';
 import { transitionSchema } from '../validators/issueSchemas.js';
 import * as analytics from '../controllers/analyticsController.js';
+import * as alertCtl from '../controllers/alertController.js';
+import { createAlertSchema } from '../validators/alertSchemas.js';
+import { weatherCheckLimiter } from '../middleware/rateLimiters.js';
+
 const router = Router();
 const superOnly = authorize('super_admin');
 
@@ -33,4 +37,12 @@ router.get('/issues/:id', asyncHandler(issueCtl.adminDetail));
 router.post('/issues/:id/transition', uploadPhoto, validate(transitionSchema), asyncHandler(issueCtl.adminTransition));
 router.get('/analytics', asyncHandler(analytics.adminAnalytics));
 router.get('/hotspots', asyncHandler(analytics.hotspots));
+
+const notStaff = authorize('admin', 'super_admin');
+router.get('/alerts', notStaff, asyncHandler(alertCtl.listRecent));
+router.post('/alerts', notStaff, validate(createAlertSchema), asyncHandler(alertCtl.create));
+router.post('/alerts/:id/withdraw', notStaff, asyncHandler(alertCtl.withdraw));
+router.get('/flood-zones', notStaff, asyncHandler(alertCtl.listZones));
+router.post('/weather/check', notStaff, weatherCheckLimiter, asyncHandler(alertCtl.checkNow));
+
 export default router;

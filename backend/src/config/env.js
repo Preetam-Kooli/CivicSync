@@ -43,6 +43,13 @@ if (cronSecret && cronSecret.length < 24) {
   console.error('CRON_SECRET must be at least 24 characters long');
   process.exit(1);
 }
+// Testing only: pretend the next 24 hours bring this many mm of rain. Always ignored in production.
+const simulated = process.env.WEATHER_SIMULATE_MM;
+const weatherSimulateMm = !isProd && simulated !== undefined && simulated !== '' ? Number(simulated) : null;
+if (weatherSimulateMm !== null && !(weatherSimulateMm >= 0)) {
+  console.error('WEATHER_SIMULATE_MM must be a number of 0 or more');
+  process.exit(1);
+}
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -53,4 +60,5 @@ export const env = {
   trustProxyHops,
   cloudinaryUrl,
   cronSecret,
+  weatherSimulateMm,
 };

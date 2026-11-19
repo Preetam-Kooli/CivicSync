@@ -7,6 +7,7 @@ import RegisterPage from './pages/register/RegisterPage.jsx';
 import AcceptInvitePage from './pages/invite/AcceptInvitePage.jsx';
 import CitizenLayout from './portals/citizen/CitizenLayout.jsx';
 import CitizenHome from './portals/citizen/CitizenHome.jsx';
+import AlertBanner from './shared/AlertBanner.jsx';
 
 const TransparencyPage = lazy(() => import('./pages/public/TransparencyPage.jsx'));
 const OpenDataPage = lazy(() => import('./pages/public/OpenDataPage.jsx'));
@@ -15,7 +16,7 @@ const ReportIssuePage = lazy(() => import('./portals/citizen/ReportIssuePage.jsx
 const MyReportsPage = lazy(() => import('./portals/citizen/MyReportsPage.jsx'));
 const ReportDetailPage = lazy(() => import('./portals/citizen/ReportDetailPage.jsx'));
 const IssueMapPage = lazy(() => import('./shared/IssueMapPage.jsx'));
-
+const AlertsPage = lazy(() => import('./portals/admin/AlertsPage.jsx'));
 const AdminLayout = lazy(() => import('./portals/admin/AdminLayout.jsx'));
 const AdminHome = lazy(() => import('./portals/admin/AdminHome.jsx'));
 const IssuesPage = lazy(() => import('./portals/admin/IssuesPage.jsx'));
@@ -28,7 +29,7 @@ const InvitesPage = lazy(() => import('./portals/admin/InvitesPage.jsx'));
 export default function App() {
   return (
     <>
-      {/* Phase 8: the emergency banner goes here */}
+      <AlertBanner />
       <Suspense fallback={<FullPageSpinner />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="issues" element={<IssuesPage />} />
             <Route path="issues/:id" element={<IssueDetailPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
             <Route path="hotspots" element={<HotspotsPage />} />
             <Route path="map" element={<IssueMapPage detailPath={(id) => `/admin/issues/${id}`} />} />
             <Route path="users" element={<UsersPage />} />

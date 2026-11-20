@@ -45,4 +45,8 @@ router.post('/alerts/:id/withdraw', notStaff, asyncHandler(alertCtl.withdraw));
 router.get('/flood-zones', notStaff, asyncHandler(alertCtl.listZones));
 router.post('/weather/check', notStaff, weatherCheckLimiter, asyncHandler(alertCtl.checkNow));
 
+
+router.get('/summary', asyncHandler(analytics.summary));
+router.get('/reports', asyncHandler(analytics.reports));
+router.get('/issue-list', asyncHandler(issueCtl.adminListPaged));
 export default router;

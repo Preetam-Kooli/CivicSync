@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth.js';
 import { api } from '../../lib/api.js';
 import FullPageSpinner from '../../shared/FullPageSpinner.jsx';
+import Logo from '../../ui/Logo.jsx';
 
 // These mirror the server's rules, so the user sees them while typing.
 // The server checks again: browser checks can always be bypassed.
@@ -101,9 +102,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-slate-50 p-4">
+    <main className="grid min-h-dvh brand-wash place-items-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg sm:p-8">
-        <h1 className="text-center text-3xl font-bold text-emerald-700">CivicSync</h1>
+        <h1 className="flex justify-center"><Logo stacked /></h1>
         <p className="mt-1 text-center text-sm text-slate-500">Create a citizen account</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>

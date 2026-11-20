@@ -1,1 +1,69 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme static {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Brand green: the PDF's teal, very slightly lighter and greener */
+  --color-brand-50: #effbf8; --color-brand-100: #dbf5f0; --color-brand-200: #b8eae0; --color-brand-300: #83d8c7;
+  --color-brand-400: #45c4ab; --color-brand-500: #23a98e; --color-brand-600: #14856e; --color-brand-700: #106a58;
+  --color-brand-800: #0f5748; --color-brand-900: #0e4439; --color-brand-950: #072c25;
+
+  /* Every existing "emerald" class now renders in the brand green */
+  --color-emerald-50: #effbf8; --color-emerald-100: #dbf5f0; --color-emerald-200: #b8eae0; --color-emerald-300: #83d8c7;
+  --color-emerald-400: #45c4ab; --color-emerald-500: #23a98e; --color-emerald-600: #14856e; --color-emerald-700: #106a58;
+  --color-emerald-800: #0f5748; --color-emerald-900: #0e4439; --color-emerald-950: #072c25;
+
+  --color-slate-50: #f3faf8; /* the soft mint page background from the PDFs */
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
+  --shadow-sm: 0 1px 2px rgb(11 36 39 / 0.04), 0 10px 28px -16px rgb(11 36 39 / 0.22);
+}
+
+:root { color-scheme: light; --card: #ffffff; --ink: #0f172a; }
+
+/* DARK THEME: swapping these variables flips every page, old and new */
+.dark {
+  color-scheme: dark; --card: #111b2b; --ink: #e2e8f0;
+  --color-slate-50: #0a111d; --color-slate-100: #162135; --color-slate-200: #223049; --color-slate-300: #2e3f5c;
+  --color-slate-400: #64748b; --color-slate-500: #94a3b8; --color-slate-600: #a9b6c8; --color-slate-700: #c3cddb;
+  --color-slate-800: #e2e8f0; --color-slate-900: #f1f5f9;
+  --color-brand-50: #0d2a26; --color-brand-100: #11403a; --color-emerald-50: #0d2a26; --color-emerald-100: #11403a;
+  --color-red-50: rgb(248 113 113 / 0.14); --color-red-100: rgb(248 113 113 / 0.22);
+  --color-amber-50: rgb(251 191 36 / 0.14); --color-amber-100: rgb(251 191 36 / 0.22);
+  --color-sky-50: rgb(56 189 248 / 0.14); --color-sky-100: rgb(56 189 248 / 0.22);
+  --color-violet-50: rgb(167 139 250 / 0.16); --color-orange-50: rgb(251 146 60 / 0.15);
+}
+.dark .bg-white { background-color: var(--card); }
+.dark .text-emerald-700, .dark .text-emerald-800, .dark .text-brand-700, .dark .text-brand-800 { color: #83d8c7; }
+.dark .text-red-600, .dark .text-red-700, .dark .text-red-800 { color: #fca5a5; }
+.dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900, .dark .text-amber-950 { color: #fcd34d; }
+.dark .text-sky-700, .dark .text-sky-950 { color: #7dd3fc; }
+.dark .text-violet-700 { color: #c4b5fd; }
+.dark .text-orange-700 { color: #fdba74; }
+.dark ::placeholder { color: #64748b; }
+
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--color-slate-50); color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+.sidebar-surface { background: linear-gradient(180deg, #0f3033 0%, #0b2427 60%, #081b1d 100%); }
+.glass { background: color-mix(in srgb, var(--card) 86%, transparent); backdrop-filter: blur(12px); }
+.fab { background: linear-gradient(135deg, #23a98e, #14856e); }
+.brand-wash {
+  background: radial-gradient(1100px 480px at 12% -10%, #dbf5f0 0%, transparent 60%),
+              radial-gradient(900px 480px at 100% 0%, #e0f2fe 0%, transparent 55%), var(--color-slate-50);
+}
+.dark .brand-wash { background: radial-gradient(1000px 480px at 12% -10%, #0e3a35 0%, transparent 60%), var(--color-slate-50); }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+dialog::backdrop { background: rgb(2 12 14 / 0.55); backdrop-filter: blur(2px); }
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+@media print {
+  aside, nav, header, .no-print { display: none !important; }
+  main, .lg\:pl-64 { padding-left: 0 !important; }
+  body { background: #fff; }
+}

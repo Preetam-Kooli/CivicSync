@@ -49,3 +49,10 @@ export function openApi(req, res) {
   cache(res);
   res.json(openApiSpec);
 }
+
+export async function summary(req, res) {
+  res.json(await svc.adminSummary(actorFrom(req)));
+}
+export async function reports(req, res) {
+  res.json(await svc.adminReports(req.query, actorFrom(req)));
+}

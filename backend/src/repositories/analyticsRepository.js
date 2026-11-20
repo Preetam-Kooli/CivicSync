@@ -199,3 +199,101 @@ export async function openMonthly() {
   );
   return rows;
 }
+
+// ---------- Dashboard summary ----------
+export async function adminSummary(module) {
+  const p = [module];
+  const scope = '($1::module_type IS NULL OR c.module = $1::module_type)';
+  const [counts, series, attention, byModule] = await Promise.all([
+    query(
+      `SELECT count(*) FILTER (WHERE i.created_at >= date_trunc('day', now()))::int AS new_today,
+              count(*) FILTER (WHERE i.created_at >= date_trunc('day', now()) - interval '1 day' AND i.created_at < date_trunc('day', now()))::int AS new_yesterday,
+              count(*) FILTER (WHERE i.status = 'in_progress')::int AS in_progress,
+              count(*) FILTER (WHERE i.status = 'assigned')::int AS assigned,
+              count(*) FILTER (WHERE i.status <> 'resolved' AND i.sla_deadline < now())::int AS overdue,
+              count(*) FILTER (WHERE i.resolved_at >= now() - interval '7 days')::int AS resolved_7d,
+              count(*) FILTER (WHERE i.resolved_at >= now() - interval '14 days' AND i.resolved_at < now() - interval '7 days')::int AS resolved_prev_7d,
+              count(*) FILTER (WHERE i.status = 'reported')::int AS to_verify
+         FROM issues i JOIN categories c ON c.id = i.category_id WHERE ${scope}`, p),
+    query(
+      `SELECT to_char(d, 'YYYY-MM-DD') AS day, count(x.id)::int AS reported
+         FROM generate_series(date_trunc('day', now()) - interval '6 days', date_trunc('day', now()), interval '1 day') d
+         LEFT JOIN (SELECT i.id, i.created_at FROM issues i JOIN categories c ON c.id = i.category_id WHERE ${scope}) x
+           ON date_trunc('day', x.created_at) = d
+        GROUP BY d ORDER BY d`, p),
+    query(
+      `SELECT i.id, i.title, i.ward, i.status, i.sla_deadline, i.created_at, c.module,
+              (i.status <> 'resolved' AND i.sla_deadline < now()) AS overdue
+         FROM issues i JOIN categories c ON c.id = i.category_id
+        WHERE i.status <> 'resolved' AND (i.sla_deadline < now() OR i.status = 'reported') AND ${scope}
+        ORDER BY overdue DESC, i.priority_score DESC LIMIT 5`, p),
+    query(
+      `SELECT c.module, count(*)::int AS total FROM issues i JOIN categories c ON c.id = i.category_id
+        WHERE i.status <> 'resolved' AND ${scope} GROUP BY c.module ORDER BY total DESC`, p),
+  ]);
+  const c = counts.rows[0];
+  return {
+    counts: {
+      newToday: c.new_today, newYesterday: c.new_yesterday, inProgress: c.in_progress, assigned: c.assigned,
+      overdue: c.overdue, resolved7d: c.resolved_7d, resolvedPrev7d: c.resolved_prev_7d, toVerify: c.to_verify,
+    },
+    series: series.rows,
+    attention: attention.rows.map((r) => ({
+      id: r.id, title: r.title, ward: r.ward, status: r.status, module: r.module,
+      slaDeadline: r.sla_deadline, createdAt: r.created_at, overdue: r.overdue,
+    })),
+    byModule: byModule.rows,
+  };
+}
+
+// ---------- Reports for a date range ----------
+export async function adminReports(module, days) {
+  const p = [module, days];
+  const F = '($1::module_type IS NULL OR module = $1::module_type)';
+  const MF = '($1::module_type IS NULL OR m.module = $1::module_type)';
+  const inWin = (col) => `${col} >= now() - make_interval(days => $2::int)`;
+  const inPrev = (col) => `${col} >= now() - make_interval(days => $2::int * 2) AND ${col} < now() - make_interval(days => $2::int)`;
+  const [k, overdue, daily, byModule, wards] = await Promise.all([
+    query(
+      `SELECT round(avg(resolution_hours) FILTER (WHERE ${inWin('resolved_at')})::numeric, 1) AS avg_now,
+              round(avg(resolution_hours) FILTER (WHERE ${inPrev('resolved_at')})::numeric, 1) AS avg_prev,
+              count(*) FILTER (WHERE ${inWin('created_at')})::int AS reported,
+              count(*) FILTER (WHERE ${inWin('created_at')} AND status = 'resolved')::int AS resolved,
+              count(*) FILTER (WHERE ${inWin('created_at')} AND status = 'reported')::int AS new_n,
+              count(*) FILTER (WHERE ${inWin('created_at')} AND status NOT IN ('reported', 'resolved'))::int AS active_n,
+              count(*) FILTER (WHERE ${inPrev('created_at')})::int AS prev_reported,
+              count(*) FILTER (WHERE ${inPrev('created_at')} AND status = 'resolved')::int AS prev_resolved
+         FROM v_issue_metrics WHERE ${F}`, p),
+    query(
+      `SELECT count(*)::int AS n FROM issues i JOIN categories c ON c.id = i.category_id
+        WHERE i.status <> 'resolved' AND i.sla_deadline < now() AND ($1::module_type IS NULL OR c.module = $1::module_type)`, [module]),
+    query(
+      `WITH d AS (SELECT generate_series(date_trunc('day', now()) - make_interval(days => $2::int - 1), date_trunc('day', now()), interval '1 day') AS day)
+       SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+              (SELECT count(*)::int FROM v_issue_metrics m WHERE date_trunc('day', m.created_at) = d.day AND ${MF}) AS reported,
+              (SELECT count(*)::int FROM v_issue_metrics m WHERE date_trunc('day', m.resolved_at) = d.day AND ${MF}) AS resolved
+         FROM d ORDER BY d.day`, p),
+    query(
+      `SELECT module, count(*) FILTER (WHERE ${inWin('created_at')})::int AS total,
+              round(avg(resolution_hours) FILTER (WHERE ${inWin('resolved_at')})::numeric, 1) AS avg_hours
+         FROM v_issue_metrics WHERE ${F} GROUP BY module ORDER BY module`, p),
+    query(
+      `SELECT COALESCE(ward, 'Unassigned') AS ward, count(*)::int AS total FROM v_issue_metrics
+        WHERE ${inWin('created_at')} AND ${F} GROUP BY 1 ORDER BY total DESC LIMIT 8`, p),
+  ]);
+  const r = k.rows[0];
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) : null);
+  return {
+    days,
+    kpis: {
+      avgHours: num(r.avg_now), prevAvgHours: num(r.avg_prev),
+      reported: r.reported, prevReported: r.prev_reported,
+      resolutionRate: pct(r.resolved, r.reported), prevResolutionRate: pct(r.prev_resolved, r.prev_reported),
+      overdueNow: overdue.rows[0].n,
+    },
+    status: { resolved: r.resolved, active: r.active_n, fresh: r.new_n },
+    daily: daily.rows,
+    byModule: byModule.rows.map((m) => ({ module: m.module, total: m.total, avgHours: num(m.avg_hours) })),
+    wards: wards.rows,
+  };
+}

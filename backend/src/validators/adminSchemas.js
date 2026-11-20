@@ -9,6 +9,7 @@ export const createInviteSchema = z
     email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254),
     role: z.enum(['staff', 'admin']),
     department: z.enum(DEPARTMENTS).optional(),
+    hours: z.coerce.number().int().refine((h) => [24, 48, 72].includes(h), 'Choose 24, 48 or 72 hours').default(48),
   })
   .refine((d) => d.role !== 'staff' || Boolean(d.department), {
     message: 'Choose a department for staff accounts',

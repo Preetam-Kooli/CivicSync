@@ -9,6 +9,7 @@ export const toPublicUser = (row) => ({
   phone: row.phone,
   role: row.role,
   department: row.department,
+  totpEnabled: row.totp_enabled,
   createdAt: row.created_at,
 });
 
@@ -68,7 +69,9 @@ export async function listAll() {
   const { rows } = await query(
     `SELECT id, full_name, email, role, department, is_active, totp_enabled,
             (locked_until IS NOT NULL AND locked_until > now()) AS is_locked,
-            created_at
+            created_at,
+            (SELECT max(a.created_at) FROM audit_logs a
+            WHERE a.user_id = users.id AND a.success AND a.action IN ('login_success', 'login_success_2fa')) AS last_active
        FROM users ORDER BY id`
   );
   return rows;
@@ -108,4 +111,13 @@ export async function resetTotp(id) {
 export async function setActive(id, active) {
   const { rowCount } = await query('UPDATE users SET is_active = $2 WHERE id = $1', [id, active]);
   return rowCount === 1;
+}
+
+export async function updateProfile(id, { fullName, phone }) {
+  const { rows } = await query('UPDATE users SET full_name = $2, phone = $3 WHERE id = $1 RETURNING *', [id, fullName, phone]);
+  return rows[0] || null;
+}
+
+export async function updatePasswordHash(id, hash) {
+  await query('UPDATE users SET password_hash = $2 WHERE id = $1', [id, hash]);
 }

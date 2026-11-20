@@ -17,7 +17,7 @@ const statusOf = (row) =>
   : new Date(row.expires_at) <= new Date() ? 'expired'
   : 'pending';
 
-export async function createInvite({ email, role, department }, actor, meta) {
+export async function createInvite({ email, role, department, hours }, actor, meta) {
   if (await userRepo.findByEmail(email)) {
     throw new AppError(409, 'An account with this email already exists');
   }
@@ -34,7 +34,7 @@ export async function createInvite({ email, role, department }, actor, meta) {
       department: role === 'staff' ? department : null,
       tokenHash: hashToken(token),
       createdBy: actor.userId,
-      expiresAt: new Date(Date.now() + INVITE_TTL_HOURS * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + (hours || INVITE_TTL_HOURS) * 60 * 60 * 1000),
     });
   } catch (err) {
     if (err.code === '23505') {

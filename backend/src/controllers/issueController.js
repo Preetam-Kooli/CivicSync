@@ -51,3 +51,7 @@ export async function adminTransition(req, res) {
   await issueService.transition(parseId(req.params.id), req.body, actorFrom(req), req.file, metaFrom(req));
   res.json({ message: 'Issue updated' });
 }
+
+export async function adminListPaged(req, res) {
+  res.json(await issueService.adminListPaged(req.query, actorFrom(req)));
+}

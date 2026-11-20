@@ -46,3 +46,5 @@ export async function openIssues(q) {
 
 export const openCategories = () => repo.openCategories();
 export const openMonthly = () => repo.openMonthly();
+export const adminSummary = (actor) => repo.adminSummary(actor.role === 'staff' ? actor.department : null);
+export const adminReports = (q, actor) => repo.adminReports(scopeModule(q, actor), oneOf(q.days, [7, 30, 90], 30));

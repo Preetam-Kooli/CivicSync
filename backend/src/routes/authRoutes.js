@@ -18,6 +18,10 @@ import {
   inviteAcceptSchema,
 } from '../validators/authSchemas.js';
 import * as authController from '../controllers/authController.js';
+import * as account from '../controllers/accountController.js';
+import { profileSchema, changePasswordSchema } from '../validators/authSchemas.js';
+import { passwordLimiter } from '../middleware/rateLimiters.js';
+
 
 const router = Router();
 
@@ -34,5 +38,8 @@ router.post('/2fa/verify', twoFactorLimiter, validate(twoFactorVerifySchema), as
 // Invitation links (public, because the invitee has no account yet)
 router.post('/invite/inspect', inviteLimiter, validate(inviteTokenSchema), asyncHandler(authController.inviteInspect));
 router.post('/invite/accept', inviteLimiter, validate(inviteAcceptSchema), asyncHandler(authController.inviteAccept));
+router.patch('/profile', authenticate, validate(profileSchema), asyncHandler(account.profile));
+router.post('/change-password', authenticate, passwordLimiter, validate(changePasswordSchema), asyncHandler(account.password));
+router.post('/logout-all', authenticate, asyncHandler(account.logoutAll));
 
 export default router;

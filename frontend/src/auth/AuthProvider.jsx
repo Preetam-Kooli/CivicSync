@@ -52,9 +52,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+    const updateUser = useCallback(
+    (patch) => setSession((s) => (s ? { ...s, user: { ...s.user, ...patch } } : s)),
+    []
+  );
+
   const value = useMemo(
-    () => ({ session, loading, login, completeTwoFactor, logout }),
-    [session, loading, login, completeTwoFactor, logout]
+    () => ({ session, loading, login, completeTwoFactor, logout, updateUser }),
+    [session, loading, login, completeTwoFactor, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -148,3 +148,17 @@ export async function transition(id, { to, assigneeId, note }, actor, file, meta
     ...meta,
   });
 }
+
+export async function adminListPaged(q, actor) {
+  await ensureFresh();
+  return issueRepo.listAdminPaged(
+    {
+      status: STATUSES.has(q.status) ? q.status : undefined,
+      module: MODULES.has(q.module) ? q.module : undefined,
+      q: String(q.q || '').slice(0, 80),
+      limit: Math.min(Math.max(parseInt(q.limit ?? '25', 10) || 25, 1), 200),
+      offset: Math.max(parseInt(q.offset ?? '0', 10) || 0, 0),
+    },
+    actor.role === 'staff' ? actor.department : null
+  );
+}

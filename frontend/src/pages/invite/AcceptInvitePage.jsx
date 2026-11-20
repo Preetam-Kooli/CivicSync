@@ -7,6 +7,7 @@ import FullPageSpinner from '../../shared/FullPageSpinner.jsx';
 import { PASSWORD_RULES } from '../../shared/passwordRules.js';
 import TwoFactorStep from '../login/TwoFactorStep.jsx';
 import { ROLE_LABELS, deptLabel } from '../../portals/admin/constants.js';
+import Logo from '../../ui/Logo.jsx';
 
 export default function AcceptInvitePage() {
   const { session, loading, logout } = useAuth();
@@ -36,9 +37,9 @@ export default function AcceptInvitePage() {
   if (loading) return <FullPageSpinner />;
 
   const shell = (children) => (
-    <main className="grid min-h-dvh place-items-center bg-slate-50 p-4">
+    <main className="grid min-h-dvh brand-wash place-items-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg sm:p-8">
-        <h1 className="text-center text-3xl font-bold text-amber-700">CivicSync</h1>
+        <h1 className="flex justify-center"><Logo stacked /></h1>
         {children}
       </div>
     </main>

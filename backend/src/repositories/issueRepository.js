@@ -251,3 +251,45 @@ export async function reopen(db, id) {
     [id]
   );
 }
+
+// Search, status counts and paging for the redesigned Issues page
+export async function listAdminPaged({ status, module, q, limit, offset }, scopeModule) {
+  const where = [];
+  const params = [];
+  const add = (sql, value) => {
+    params.push(value);
+    where.push(sql.replaceAll('?', `$${params.length}`));
+  };
+  if (module) add('c.module = ?::module_type', module);
+  if (scopeModule) add('c.module = ?::module_type', scopeModule);
+  if (q) {
+    const needle = q.trim().replace(/^#?cs-?/i, '');
+    params.push(`%${needle.replace(/[\\%_]/g, '\\$&')}%`);
+    const like = `$${params.length}`;
+    params.push(needle);
+    where.push(`(i.title ILIKE ${like} OR i.address_text ILIKE ${like} OR i.ward ILIKE ${like} OR i.id::text = $${params.length})`);
+  }
+  const baseWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const countRes = await query(
+    `SELECT i.status, count(*)::int AS n FROM issues i JOIN categories c ON c.id = i.category_id ${baseWhere} GROUP BY i.status`,
+    params
+  );
+  const counts = Object.fromEntries(countRes.rows.map((r) => [r.status, r.n]));
+  const all = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  const listParams = [...params];
+  let listWhere = baseWhere;
+  if (status) {
+    listParams.push(status);
+    listWhere += `${baseWhere ? ' AND' : 'WHERE'} i.status = $${listParams.length}::issue_status`;
+  }
+  listParams.push(limit, offset);
+  const { rows } = await query(
+    `${SELECT_ISSUE} ${listWhere}
+      ORDER BY (i.status = 'resolved'), i.priority_score DESC, i.created_at
+      LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+    listParams
+  );
+  return { issues: rows.map(toIssue), total: status ? counts[status] || 0 : all, counts: { all, ...counts } };
+}

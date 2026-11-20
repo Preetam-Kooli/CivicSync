@@ -56,3 +56,8 @@ export const weatherCheckLimiter = rateLimit({
   limit: 6,
   keyGenerator: (req) => String(req.auth.userId),
 });
+
+export const passwordLimiter = rateLimit({
+  ...base, windowMs: MINUTES_15, limit: 6, skipSuccessfulRequests: true,
+  keyGenerator: (req) => String(req.auth.userId),
+});

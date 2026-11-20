@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth.js';
 import FullPageSpinner from '../../shared/FullPageSpinner.jsx';
 import TwoFactorStep from './TwoFactorStep.jsx';
+import Logo from '../../ui/Logo.jsx';
 
 const PORTALS = [
   { id: 'citizen', label: 'Citizen' },
@@ -52,9 +53,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-slate-50 p-4">
+    <main className="grid min-h-dvh brand-wash place-items-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg sm:p-8">
-        <h1 className="text-center text-3xl font-bold text-emerald-700">CivicSync</h1>
+        <h1 className="flex justify-center"><Logo stacked /></h1>
         <p className="mt-1 text-center text-sm text-slate-500">
           Public services and community safety in one place
         </p>

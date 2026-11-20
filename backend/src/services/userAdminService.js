@@ -16,6 +16,7 @@ export async function list() {
     totpEnabled: r.totp_enabled,
     isLocked: r.is_locked,
     createdAt: r.created_at,
+    lastActive: r.last_active,
   }));
 }
 

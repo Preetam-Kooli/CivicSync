@@ -73,3 +73,13 @@ export const inviteAcceptSchema = z.object({
   fullName: z.string().trim().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
   password: strongPassword,
 });
+
+export const profileSchema = z.object({
+  fullName: z.string().trim().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
+  phone: z.string().trim().regex(/^[0-9+\-\s]{7,15}$/, 'Enter a valid phone number').or(z.literal('')).optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password').max(72),
+  newPassword: strongPassword,
+});

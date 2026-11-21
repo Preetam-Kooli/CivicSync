@@ -67,3 +67,12 @@ dialog::backdrop { background: rgb(2 12 14 / 0.55); backdrop-filter: blur(2px); 
   main, .lg\:pl-64 { padding-left: 0 !important; }
   body { background: #fff; }
 }
+
+/* Tailwind's reset removes the auto-centering of native dialogs: put it back */
+@layer base { dialog { margin: auto; } }
+
+/* Map popups always have a white card, so keep their text dark in both themes */
+.maplibregl-popup-content { color: #0f172a; }
+
+/* In dark mode the slate scale is inverted: keep dark "pill" badges readable */
+.dark .bg-slate-800, .dark .bg-slate-900 { background-color: var(--color-brand-700); }

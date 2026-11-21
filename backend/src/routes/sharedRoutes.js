@@ -8,4 +8,6 @@ router.get('/categories', asyncHandler(issues.categories));
 router.get('/map', asyncHandler(issues.mapData));
 
 router.get('/flood-zones', asyncHandler(alerts.zonesGeo));
+
+router.get('/alert-areas', asyncHandler(alerts.areasGeo));
 export default router;

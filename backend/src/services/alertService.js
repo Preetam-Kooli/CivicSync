@@ -29,3 +29,5 @@ export async function withdraw(id, actor, meta) {
     action: 'broadcast_withdrawn', success: true, ...meta,
   });
 }
+
+export const areasGeoJSON = () => repo.areasGeoJSON();

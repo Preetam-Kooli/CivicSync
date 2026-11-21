@@ -1,6 +1,7 @@
 import { query } from '../config/db.js';
 
 const SEVERITY_ORDER = `CASE b.severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`;
+const ACTIVE = `b.withdrawn_at IS NULL AND b.starts_at <= now() AND b.expires_at > now()`;
 
 const toAlert = (r) => ({
   id: r.id,
@@ -13,34 +14,37 @@ const toAlert = (r) => ({
   expiresAt: r.expires_at,
   withdrawnAt: r.withdrawn_at,
   postedBy: r.posted_by ?? null,
+  locationName: r.location_name ?? null,
+  hasArea: r.radius_m != null,
+  radiusM: r.radius_m ?? null,
 });
 
 // What the banner shows: not withdrawn, already started, not yet expired. Worst first.
 export async function listActive() {
   const { rows } = await query(
-    `SELECT b.* FROM broadcasts b
-      WHERE b.withdrawn_at IS NULL AND b.starts_at <= now() AND b.expires_at > now()
-      ORDER BY ${SEVERITY_ORDER}, b.created_at DESC
-      LIMIT 10`
+    `SELECT b.* FROM broadcasts b WHERE ${ACTIVE} ORDER BY ${SEVERITY_ORDER}, b.created_at DESC LIMIT 10`
   );
   return rows.map(toAlert);
 }
 
 export async function listRecent() {
   const { rows } = await query(
-    `SELECT b.*, u.full_name AS posted_by
-       FROM broadcasts b LEFT JOIN users u ON u.id = b.created_by
+    `SELECT b.*, u.full_name AS posted_by FROM broadcasts b LEFT JOIN users u ON u.id = b.created_by
       ORDER BY b.id DESC LIMIT 50`
   );
   return rows.map(toAlert);
 }
 
-export async function insertManual({ kind, severity, title, message, hours, createdBy }) {
+export async function insertManual({ kind, severity, title, message, hours, createdBy, locationName, latitude, longitude, radiusM }) {
+  const hasPin = latitude !== undefined && longitude !== undefined;
   const { rows } = await query(
-    `INSERT INTO broadcasts (kind, severity, title, message, created_by, expires_at)
-     VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6::int))
+    `INSERT INTO broadcasts (kind, severity, title, message, created_by, expires_at, location_name, location, radius_m)
+     VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6::int), $7,
+             CASE WHEN $8::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($8::float8, $9::float8), 4326)::geography END,
+             $10)
      RETURNING id, title`,
-    [kind, severity, title, message, createdBy, hours]
+    [kind, severity, title, message, createdBy, hours, locationName || null,
+      hasPin ? longitude : null, hasPin ? latitude : null, hasPin ? radiusM || 500 : null]
   );
   return rows[0];
 }
@@ -51,6 +55,23 @@ export async function withdraw(id) {
     [id]
   );
   return rows[0] || null;
+}
+
+// Active announcements that have a pin, as map areas (a circle of radius_m metres around the pin)
+export async function areasGeoJSON() {
+  const { rows } = await query(
+    `SELECT b.id, b.kind, b.severity, b.title, b.message, b.location_name,
+            ST_AsGeoJSON(ST_Buffer(b.location, b.radius_m)::geometry)::json AS geometry
+       FROM broadcasts b WHERE b.location IS NOT NULL AND ${ACTIVE}`
+  );
+  return {
+    type: 'FeatureCollection',
+    features: rows.map((r) => ({
+      type: 'Feature',
+      geometry: r.geometry,
+      properties: { id: r.id, kind: r.kind, severity: r.severity, title: r.title, message: r.message, locationName: r.location_name },
+    })),
+  };
 }
 
 // ---------- Flood zones ----------
@@ -77,14 +98,12 @@ export async function zonesGeoJSON() {
       geometry: r.geometry,
       properties: {
         id: r.id, name: r.name, status: r.status,
-        forecastMm: r.forecast_mm === null ? null : Number(r.forecast_mm),
-        checkedAt: r.checked_at,
+        forecastMm: r.forecast_mm === null ? null : Number(r.forecast_mm), checkedAt: r.checked_at,
       },
     })),
   };
 }
 
-// The weather check queries the forecast at each zone's centre point
 export async function zonesForCheck() {
   const { rows } = await query(
     `SELECT id, name, watch_mm, high_mm,
@@ -98,13 +117,11 @@ export async function saveForecast(id, mm, status) {
   await query('UPDATE flood_zones SET forecast_mm = $2, status = $3::zone_status, checked_at = now() WHERE id = $1', [id, mm, status]);
 }
 
-// Keeps exactly one live automatic alert per zone: create it, refresh it, or withdraw it.
-// Every refresh pushes the expiry 3 hours ahead, so if the checks ever stop, the alert expires by itself.
+// One live automatic alert per zone: create it, refresh it, or withdraw it
 export async function syncWeatherAlert(zone, status, mm) {
   if (status === 'normal') {
     await query(
-      `UPDATE broadcasts SET withdrawn_at = now()
-        WHERE source = 'weather' AND zone_id = $1 AND withdrawn_at IS NULL`,
+      `UPDATE broadcasts SET withdrawn_at = now() WHERE source = 'weather' AND zone_id = $1 AND withdrawn_at IS NULL`,
       [zone.id]
     );
     return;
@@ -118,15 +135,15 @@ export async function syncWeatherAlert(zone, status, mm) {
 
   const updated = await query(
     `UPDATE broadcasts
-        SET severity = $2, title = $3, message = $4, expires_at = now() + interval '3 hours'
+        SET severity = $2, title = $3, message = $4, location_name = $5, expires_at = now() + interval '3 hours'
       WHERE source = 'weather' AND zone_id = $1 AND withdrawn_at IS NULL`,
-    [zone.id, severity, title, message]
+    [zone.id, severity, title, message, zone.name]
   );
   if (updated.rowCount === 0) {
     await query(
-      `INSERT INTO broadcasts (kind, severity, title, message, source, zone_id, expires_at)
-       VALUES ('flood', $1, $2, $3, 'weather', $4, now() + interval '3 hours')`,
-      [severity, title, message, zone.id]
+      `INSERT INTO broadcasts (kind, severity, title, message, source, zone_id, location_name, expires_at)
+       VALUES ('flood', $1, $2, $3, 'weather', $4, $5, now() + interval '3 hours')`,
+      [severity, title, message, zone.id, zone.name]
     );
   }
 }

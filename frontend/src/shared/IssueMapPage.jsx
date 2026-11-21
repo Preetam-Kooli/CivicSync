@@ -13,13 +13,18 @@ export default function IssueMapPage({ admin = false }) {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [zones, setZones] = useState(null);
+  const [areas, setAreas] = useState(null);
   const [sel, setSel] = useState(null);
   const [error, setError] = useState('');
   const [key, setKey] = useState(0);
 
   useEffect(() => {
-    Promise.all([api('GET', '/api/shared/map'), api('GET', '/api/shared/flood-zones')])
-      .then(([m, z]) => { setData(m); setZones(z); })
+    Promise.all([
+      api('GET', '/api/shared/map'),
+      api('GET', '/api/shared/flood-zones').catch(() => null),
+      api('GET', '/api/shared/alert-areas').catch(() => null), // arrives in Step 5; the map works without it
+    ])
+      .then(([m, z, a]) => { setData(m); setZones(z); setAreas(a); })
       .catch((e) => setError(e.message));
   }, [key]);
 
@@ -41,7 +46,7 @@ export default function IssueMapPage({ admin = false }) {
       <PageHeader title="Issue map" subtitle={data ? `${open} open issues` : ''} />
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="relative h-[calc(100dvh-15rem)] min-h-[440px] lg:h-[calc(100dvh-11rem)]">
-        {data && <IssueMap className="h-full" collection={data} zones={zones} onSelect={setSel} />}
+        {data && <IssueMap className="h-full" collection={data} zones={zones} areas={areas} onSelect={setSel} />}
         {sel && (
           <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl bg-white p-4 shadow-xl lg:inset-x-auto lg:bottom-3 lg:right-3 lg:w-80">
             <div className="flex gap-3">

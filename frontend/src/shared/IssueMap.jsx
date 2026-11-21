@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CloudRain, Eye, Flame, Layers, Moon } from 'lucide-react';
+import { CloudRain, Eye, Flame, Layers, Megaphone, Moon } from 'lucide-react';
 import { GLMap, NavigationControl, GeolocateControl, Popup } from './maplibre.js';
 import { MAP_STYLES, DEFAULT_CENTER, MODULES } from './mapConfig.js';
 import { useTheme } from '../theme/useTheme.js';
@@ -7,12 +7,19 @@ import { useTheme } from '../theme/useTheme.js';
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const colorByModule = ['match', ['get', 'module'], ...MODULES.flatMap((m) => [m.id, m.color]), '#64748b'];
 const zoneColor = ['match', ['get', 'status'], 'high', '#dc2626', 'watch', '#f59e0b', '#3b82f6'];
+const areaColor = ['match', ['get', 'severity'], 'critical', '#dc2626', 'warning', '#f59e0b', '#0284c7'];
 
-function addZoneLayers(map, zones) {
-  if (map.getSource('zones')) return;
-  map.addSource('zones', { type: 'geojson', data: zones });
-  map.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', paint: { 'fill-color': zoneColor, 'fill-opacity': ['match', ['get', 'status'], 'high', 0.35, 'watch', 0.25, 0.1] } });
-  map.addLayer({ id: 'zones-line', type: 'line', source: 'zones', paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [2, 2] } });
+function addOverlays(map, zones, areas) {
+  if (!map.getSource('zones')) {
+    map.addSource('zones', { type: 'geojson', data: zones });
+    map.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', paint: { 'fill-color': zoneColor, 'fill-opacity': ['match', ['get', 'status'], 'high', 0.35, 'watch', 0.25, 0.1] } });
+    map.addLayer({ id: 'zones-line', type: 'line', source: 'zones', paint: { 'line-color': zoneColor, 'line-width': 2, 'line-dasharray': [2, 2] } });
+  }
+  if (!map.getSource('areas')) {
+    map.addSource('areas', { type: 'geojson', data: areas });
+    map.addLayer({ id: 'areas-fill', type: 'fill', source: 'areas', paint: { 'fill-color': areaColor, 'fill-opacity': 0.22 } });
+    map.addLayer({ id: 'areas-line', type: 'line', source: 'areas', paint: { 'line-color': areaColor, 'line-width': 2.5 } });
+  }
 }
 
 function addIssueLayers(map, data) {
@@ -30,16 +37,27 @@ function addIssueLayers(map, data) {
     paint: { 'circle-color': colorByModule, 'circle-radius': ['interpolate', ['linear'], ['get', 'severity'], 1, 6, 5, 11], 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } });
 }
 
+// Popups are built from text nodes, never HTML strings, so typed text can never run as code
+function popup(map, lngLat, rows) {
+  const box = document.createElement('div');
+  box.style.cssText = 'font: 14px/1.4 system-ui, sans-serif; min-width: 160px';
+  rows.forEach(([text, strong]) => box.append(Object.assign(document.createElement(strong ? 'strong' : 'div'), { textContent: text })));
+  new Popup({ maxWidth: '260px' }).setLngLat(lngLat).setDOMContent(box).addTo(map);
+}
+
 function showZone(map, e) {
   const p = e.features[0].properties;
-  const box = document.createElement('div');
-  box.style.cssText = 'font: 14px/1.4 system-ui, sans-serif; min-width: 160px; color: #0f172a';
   const risk = { normal: 'No flood risk expected', watch: 'Heavy rain watch', high: 'High flood risk' }[p.status];
-  const name = Object.assign(document.createElement('strong'), { textContent: p.name });
-  const line = Object.assign(document.createElement('div'), { textContent: risk });
-  box.append(name, line);
-  if (p.forecastMm !== undefined && p.forecastMm !== 'null') box.append(Object.assign(document.createElement('div'), { textContent: `Forecast: ${p.forecastMm} mm in 24 h` }));
-  new Popup({ maxWidth: '260px' }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
+  const rows = [[p.name, true], [risk]];
+  if (p.forecastMm !== undefined && p.forecastMm !== 'null') rows.push([`Forecast: ${p.forecastMm} mm in 24 h`]);
+  popup(map, e.lngLat, rows);
+}
+
+function showArea(map, e) {
+  const p = e.features[0].properties;
+  const rows = [[p.title, true], [p.message]];
+  if (p.locationName && p.locationName !== 'null') rows.push([`📍 ${p.locationName}`]);
+  popup(map, e.lngLat, rows);
 }
 
 const Tool = ({ icon: Icon, label, on, ...p }) => (
@@ -47,7 +65,7 @@ const Tool = ({ icon: Icon, label, on, ...p }) => (
     className={`grid size-11 place-items-center rounded-xl border shadow-md ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}><Icon size={20} /></button>
 );
 
-export default function IssueMap({ collection, zones, onSelect, className = '' }) {
+export default function IssueMap({ collection, zones, areas, onSelect, className = '' }) {
   const { dark: appDark } = useTheme();
   const [darkOverride, setDarkOverride] = useState(null);
   const dark = darkOverride ?? appDark;
@@ -56,15 +74,18 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
   const mapRef = useRef(null);
   const dataRef = useRef(EMPTY);
   const zonesRef = useRef(EMPTY);
+  const areasRef = useRef(EMPTY);
   const fittedRef = useRef(false);
   const appliedStyleRef = useRef(dark ? MAP_STYLES.dark : MAP_STYLES.light);
   const heatRef = useRef(false);
   const showZonesRef = useRef(true);
+  const showAreasRef = useRef(true);
   const onSelectRef = useRef(onSelect);
 
   const [visibleModules, setVisibleModules] = useState(() => new Set(MODULES.map((m) => m.id)));
   const [showResolved, setShowResolved] = useState(false);
   const [showZones, setShowZones] = useState(true);
+  const [showAreas, setShowAreas] = useState(true);
   const [heat, setHeat] = useState(false);
   const [tilt, setTilt] = useState(false);
 
@@ -72,6 +93,7 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
     onSelectRef.current = onSelect;
     heatRef.current = heat;
     showZonesRef.current = showZones;
+    showAreasRef.current = showAreas;
   });
 
   const visible = useMemo(() => {
@@ -93,11 +115,20 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
     map.on('styleimagemissing', (e) => {
       if (!map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
     });
+    // If the dark base map cannot be fetched, fall back to the light one instead of showing nothing
+    map.on('error', (e) => {
+      if (e.error?.status === 404 && String(e.error?.url).includes('/styles/') && appliedStyleRef.current === MAP_STYLES.dark) {
+        appliedStyleRef.current = MAP_STYLES.light;
+        setDarkOverride(false);
+        map.setStyle(MAP_STYLES.light);
+      }
+    });
     map.on('style.load', () => {
-      addZoneLayers(map, zonesRef.current);
+      addOverlays(map, zonesRef.current, areasRef.current);
       addIssueLayers(map, dataRef.current);
       map.setLayoutProperty('heat', 'visibility', heatRef.current ? 'visible' : 'none');
       for (const id of ['zones-fill', 'zones-line']) map.setLayoutProperty(id, 'visibility', showZonesRef.current ? 'visible' : 'none');
+      for (const id of ['areas-fill', 'areas-line']) map.setLayoutProperty(id, 'visibility', showAreasRef.current ? 'visible' : 'none');
     });
     map.on('click', 'clusters', async (e) => {
       const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
@@ -106,11 +137,13 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
       map.easeTo({ center: f.geometry.coordinates, zoom });
     });
     map.on('click', 'points', (e) => onSelectRef.current?.(e.features[0].properties));
+    const underneath = (e) => map.queryRenderedFeatures(e.point, { layers: ['points', 'clusters'] }).length > 0;
+    map.on('click', 'areas-fill', (e) => { if (!underneath(e)) showArea(map, e); });
     map.on('click', 'zones-fill', (e) => {
-      if (map.queryRenderedFeatures(e.point, { layers: ['points', 'clusters'] }).length) return;
+      if (underneath(e) || map.queryRenderedFeatures(e.point, { layers: ['areas-fill'] }).length) return;
       showZone(map, e);
     });
-    for (const layer of ['clusters', 'points', 'zones-fill']) {
+    for (const layer of ['clusters', 'points', 'zones-fill', 'areas-fill']) {
       map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
     }
@@ -133,6 +166,11 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
   }, [zones]);
 
   useEffect(() => {
+    areasRef.current = areas || EMPTY;
+    mapRef.current?.getSource('areas')?.setData(areasRef.current);
+  }, [areas]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map || fittedRef.current || !collection?.features.length) return;
     fittedRef.current = true;
@@ -147,6 +185,11 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
     if (!m?.getLayer('zones-fill')) return;
     for (const id of ['zones-fill', 'zones-line']) m.setLayoutProperty(id, 'visibility', showZones ? 'visible' : 'none');
   }, [showZones]);
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m?.getLayer('areas-fill')) return;
+    for (const id of ['areas-fill', 'areas-line']) m.setLayoutProperty(id, 'visibility', showAreas ? 'visible' : 'none');
+  }, [showAreas]);
   useEffect(() => { mapRef.current?.easeTo({ pitch: tilt ? 60 : 0, bearing: tilt ? -20 : 0, duration: 600 }); }, [tilt]);
   useEffect(() => {
     const m = mapRef.current;
@@ -160,7 +203,8 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
 
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-slate-200 ${className}`}>
-      <div ref={containerRef} role="region" aria-label="Issue map" className="absolute inset-0" />
+      {/* MapLibre forces position:relative on this element, so it is sized with height, not "absolute inset-0" */}
+      <div ref={containerRef} role="region" aria-label="Issue map" className="h-full w-full" />
 
       {/* Phone: one scrollable row of category chips floating over the map */}
       <div className="no-scrollbar absolute inset-x-3 top-3 z-10 flex gap-2 overflow-x-auto lg:hidden">
@@ -186,10 +230,10 @@ export default function IssueMap({ collection, zones, onSelect, className = '' }
         </ul>
       </aside>
 
-      {/* Compact tool stack */}
       <div className="absolute right-3 top-16 z-10 flex flex-col gap-2 lg:top-3">
         <Tool icon={Flame} label="Heatmap" on={heat} onClick={() => setHeat((v) => !v)} />
         <Tool icon={CloudRain} label="Flood zones" on={showZones} onClick={() => setShowZones((v) => !v)} />
+        <Tool icon={Megaphone} label="Announcements" on={showAreas} onClick={() => setShowAreas((v) => !v)} />
         <Tool icon={Eye} label="Show resolved" on={showResolved} onClick={() => setShowResolved((v) => !v)} />
         <Tool icon={Moon} label="Dark map" on={dark} onClick={() => setDarkOverride(!dark)} />
         <Tool icon={Layers} label="3D tilt" on={tilt} onClick={() => setTilt((v) => !v)} />

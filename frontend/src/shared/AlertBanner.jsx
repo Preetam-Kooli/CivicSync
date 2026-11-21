@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { MapPin } from 'lucide-react';
 
 const STYLES = {
   critical: 'bg-red-700 text-white',
@@ -68,6 +69,7 @@ export default function AlertBanner() {
               {KIND_LABELS[a.kind]}: {a.title}
             </p>
             <p className="mt-0.5">{a.message}</p>
+                        {a.locationName && <p className="mt-1 flex items-center gap-1 text-xs font-semibold opacity-90"><MapPin size={13} />{a.locationName}</p>}
           </div>
           {a.severity !== 'critical' && (
             <button

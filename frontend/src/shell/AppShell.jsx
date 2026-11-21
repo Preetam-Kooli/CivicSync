@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogOut, Moon, Plus, Search, Settings, Sun } from 'lucide-react';
 import { useAuth } from '../auth/useAuth.js';
@@ -12,7 +12,7 @@ import AlertBanner from '../shared/AlertBanner.jsx';
 import { ROLE_LABELS } from '../portals/admin/constants.js';
 import { ShellContext } from './shellContext.js';
 import { PORTALS, isVisible } from './nav.js';
-import CommandPalette from './CommandPalette.jsx';
+import SearchBox from './SearchBox.jsx';
 
 function Notifications({ summary }) {
   const [alerts, setAlerts] = useState([]);
@@ -84,7 +84,7 @@ export default function AppShell({ portal }) {
   const [summary, setSummary] = useState(null);
   const [meta, setMeta] = useState({ path: '', title: '', subtitle: '' });
   const [sheet, setSheet] = useState(null); // 'more' | 'new'
-  const [palette, setPalette] = useState(false);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -97,7 +97,7 @@ export default function AppShell({ portal }) {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPalette(true);
+        searchRef.current?.focus();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -158,11 +158,7 @@ export default function AppShell({ portal }) {
 
           {/* ---------- Desktop top bar ---------- */}
           <header className="glass sticky top-0 z-30 hidden h-16 items-center gap-3 border-b border-slate-200 px-6 lg:flex">
-            <button type="button" onClick={() => setPalette(true)} className="flex h-11 w-full max-w-md items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-400">
-              <Search size={18} />
-              <span>{isAdmin ? 'Search issues and pages…' : 'Search pages…'}</span>
-              <kbd className="ml-auto rounded-md border border-slate-300 px-1.5 py-0.5 text-[11px]">Ctrl K</kbd>
-            </button>
+            <SearchBox portal={portal} role={user.role} inputRef={searchRef} />
             <div className="ml-auto flex items-center gap-2">
               {create.length > 0 && (
                 <Menu button={({ toggle }) => <Button icon={Plus} onClick={toggle}>New</Button>}>
@@ -234,7 +230,6 @@ export default function AppShell({ portal }) {
           </div>
         </Modal>
 
-        <CommandPalette open={palette} onClose={() => setPalette(false)} portal={portal} role={user.role} />
       </div>
     </ShellContext.Provider>
   );

@@ -2,16 +2,19 @@ import { useEffect, useRef } from 'react';
 import {
   Chart, BarController, LineController, DoughnutController,
   BarElement, LineElement, PointElement, ArcElement,
-  CategoryScale, LinearScale, Tooltip, Legend,
+  CategoryScale, LinearScale, Tooltip, Legend, Filler,
 } from 'chart.js';
 
-// Chart.js is "tree-shakeable": register only the parts we use to keep the download small
-Chart.register(BarController, LineController, DoughnutController, BarElement, LineElement, PointElement, ArcElement, CategoryScale, LinearScale, Tooltip, Legend);
+Chart.register(BarController, LineController, DoughnutController, BarElement, LineElement, PointElement, ArcElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
-const reduceMotion =
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Readable axis numbers and gridlines in BOTH light and dark themes
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.22)';
+Chart.defaults.font.family = "'Inter Variable', system-ui, sans-serif";
 
-// "data" and "options" must come from useMemo in the parent. The chart is rebuilt only when they change.
+const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// "data" and "options" must come from useMemo (or a constant). The chart is rebuilt only when they change.
 export default function ChartCanvas({ type, data, options, label, height = 260 }) {
   const canvasRef = useRef(null);
 
@@ -24,7 +27,6 @@ export default function ChartCanvas({ type, data, options, label, height = 260 }
     return () => chart.destroy();
   }, [type, data, options]);
 
-  // The explicit height is what keeps the chart from growing forever on phones
   return (
     <div className="relative w-full" style={{ height }}>
       <canvas ref={canvasRef} role="img" aria-label={label} />

@@ -45,3 +45,7 @@ export async function checkNow(req, res) {
   });
   res.json({ summary, zones: await alertService.listZones() });
 }
+
+export async function areasGeo(req, res) {
+  res.json(await alertService.areasGeoJSON());
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Megaphone } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth.js';
@@ -7,12 +7,20 @@ import { api } from '../../lib/api.js';
 import PageHeader from '../../shell/PageHeader.jsx';
 import Button from '../../ui/Button.jsx';
 import { Badge, Card, EmptyState, ModuleTile, Skeleton } from '../../ui/Surface.jsx';
+import ChartCanvas from '../../shared/ChartCanvas.jsx';
 import { MODULES, MODULE_LABELS } from '../../shared/mapConfig.js';
 import { ago } from '../../shared/issueUi.js';
 import { ROLE_LABELS } from './constants.js';
 import MiniMap from './MiniMap.jsx';
 
 const COLOR = Object.fromEntries(MODULES.map((m) => [m.id, m.color]));
+const trendOptions = {
+  plugins: { legend: { display: false } },
+  scales: {
+    y: { beginAtZero: true, grace: '20%', ticks: { precision: 0 }, title: { display: true, text: 'Reports per day' } },
+    x: { grid: { display: false } },
+  },
+};
 
 function Kpi({ label, value, note, tone, dot }) {
   return (
@@ -21,19 +29,6 @@ function Kpi({ label, value, note, tone, dot }) {
       <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
       <p className={`mt-0.5 text-xs font-semibold ${tone}`}>{note}</p>
     </Card>
-  );
-}
-
-function Sparkline({ series }) {
-  const max = Math.max(1, ...series.map((s) => s.reported));
-  const pts = series.map((s, i) => [(i / Math.max(1, series.length - 1)) * 300, 70 - (s.reported / max) * 60]);
-  const line = pts.map((p) => p.join(',')).join(' ');
-  return (
-    <svg viewBox="0 0 300 80" className="h-28 w-full" role="img" aria-label="Reports in the last 7 days" preserveAspectRatio="none">
-      <defs><linearGradient id="spark" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#14856e" stopOpacity="0.28" /><stop offset="100%" stopColor="#14856e" stopOpacity="0" /></linearGradient></defs>
-      <polygon points={`0,80 ${line} 300,80`} fill="url(#spark)" />
-      <polyline points={line} fill="none" stroke="#14856e" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-    </svg>
   );
 }
 
@@ -47,6 +42,19 @@ export default function AdminHome() {
   useEffect(() => {
     api('GET', '/api/shared/map').then(setMap).catch(() => {});
   }, []);
+
+  const trend = useMemo(
+    () =>
+      summary && {
+        labels: summary.series.map((s) => new Date(`${s.day}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })),
+        datasets: [{
+          label: 'Reported', data: summary.series.map((s) => s.reported),
+          borderColor: '#14856e', backgroundColor: 'rgba(20, 133, 110, 0.15)', fill: true,
+          tension: 0.35, borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#14856e',
+        }],
+      },
+    [summary]
+  );
 
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const c = summary?.counts;
@@ -74,9 +82,8 @@ export default function AdminHome() {
 
           <div className="grid gap-5 lg:grid-cols-3">
             <Card className="lg:col-span-2">
-              <h2 className="font-semibold text-slate-900">Reports · last 7 days</h2>
-              <Sparkline series={summary.series} />
-              <div className="flex justify-between text-[11px] text-slate-400">{summary.series.map((s) => <span key={s.day}>{s.day.slice(8)}</span>)}</div>
+              <h2 className="mb-3 font-semibold text-slate-900">Reports · last 7 days</h2>
+              <ChartCanvas type="line" data={trend} options={trendOptions} height={260} label="Line chart of reports received in the last 7 days" />
             </Card>
             <Card>
               <h2 className="font-semibold text-slate-900">Open issues by category</h2>
